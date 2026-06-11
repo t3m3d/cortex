@@ -16,22 +16,27 @@ func TOP()       { emit 78 }          // TITLEH + TBARH (content origin y)
 func TBICON()    { emit 22 }          // toolbar button glyph size
 func ROWH()      { emit 24 }
 func SIDEBAR()   { emit 190 }
-func cWhite()    { emit 16777215 }
-func cBlack()    { emit 0 }
-func cTitle()    { emit 2302254 }     // 0x23262E dark title bar
-func cTitleTx()  { emit 14869218 }    // 0xE2E6EA
-func cToolbar()  { emit 14606558 }    // 0xDEE3E9
-func cBtn()      { emit 15330801 }    // 0xE9EDF1 soft circle (blends w/ toolbar)
-func cBtnBd()    { emit 12434877 }    // (unused now)
-func cGreen()    { emit 2073699 }     // 0x1FA463 accent green
-func cAddr()     { emit 16777215 }    // address field bg (white)
-func cAddrBd()   { emit 11119017 }    // 0xA9B2BD border
-func cSide()     { emit 15660020 }    // 0xEEF1F4
-func cDivider()  { emit 13160660 }    // 0xC8CED4
-func cSel()      { emit 4101887 }
-func cFolder()   { emit 15909198 }
-func cFile()     { emit 12434877 }
-func cSelLite()  { emit 14478847 }    // 0xDCE9FF
+func rgb(r, g, b) { emit r * 65536 + g * 256 + b }
+func pick(d, l, dk) { if d == 1 { emit dk }  emit l }
+// ── theme palette (d = 1 dark, 0 light) ──────────────────────────────
+func cWhite()     { emit 16777215 }
+func cBlack()     { emit 0 }
+func cGreen()     { emit 2073699 }   // 0x1FA463 accent (both themes)
+func cFolder()    { emit 15909198 }  // fallback rects
+func cFile()      { emit 12434877 }
+func cBg(d)       { emit pick(d, rgb(255,255,255), rgb(27,29,34)) }     // window / main / rows
+func cText(d)     { emit pick(d, rgb(32,33,36),    rgb(227,229,233)) }
+func cTitle(d)    { emit pick(d, rgb(237,239,242), rgb(22,24,28)) }
+func cTitleTx(d)  { emit pick(d, rgb(60,64,67),    rgb(200,205,212)) }
+func cToolbar(d)  { emit pick(d, rgb(222,227,233), rgb(36,39,46)) }
+func cBtn(d)      { emit pick(d, rgb(233,237,241), rgb(46,50,59)) }     // soft circle
+func cAddr(d)     { emit pick(d, rgb(255,255,255), rgb(42,46,54)) }
+func cAddrBd(d)   { emit pick(d, rgb(194,200,208), rgb(60,65,75)) }
+func cSide(d)     { emit pick(d, rgb(241,243,245), rgb(32,35,41)) }
+func cSideTx(d)   { emit pick(d, rgb(60,64,67),    rgb(192,197,205)) }
+func cDivider(d)  { emit pick(d, rgb(214,219,224), rgb(51,55,63)) }
+func cSel(d)      { emit pick(d, rgb(62,151,255),  rgb(62,151,255)) }
+func cSelLite(d)  { emit pick(d, rgb(220,233,255), rgb(44,58,87)) }
 func ICONSML()   { emit 20 }
 func ICONBIG()   { emit 96 }
 func CELLW()     { emit 160 }
@@ -49,16 +54,18 @@ func addrX()  { emit 142 }
 
 // ── custom cortex icons (edit these SVGs to restyle) ──────────────────
 func folderSvg() {
-    emit "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>" +
-         "<path d='M2 7 a2 2 0 0 1 2-2 h5 l2 2 h9 a2 2 0 0 1 2 2 v8 a2 2 0 0 1 -2 2 H4 a2 2 0 0 1 -2-2 z' fill='#5B4FE0'/>" +
-         "<path d='M2 10 h20 v7 a2 2 0 0 1 -2 2 H4 a2 2 0 0 1 -2-2 z' fill='#7C71F2'/></svg>"
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'>" +
+         "<stop offset='0' stop-color='#8579F6'/><stop offset='1' stop-color='#5E50E6'/></linearGradient></defs>" +
+         "<path d='M7 14 a3 3 0 0 1 3-3 h8.3 a2.5 2.5 0 0 1 1.8 0.75 l2.6 2.6 a2.5 2.5 0 0 0 1.8 0.75 H38 a3 3 0 0 1 3 3 v14 a3 3 0 0 1 -3 3 H10 a3 3 0 0 1 -3-3 z' fill='#4B40C7'/>" +
+         "<path d='M6 23 a3 3 0 0 1 3-3 h30 a3 3 0 0 1 3 3 v11 a3 3 0 0 1 -3 3 H9 a3 3 0 0 1 -3-3 z' fill='url(#g)'/></svg>"
 }
 func fileSvg() {
-    emit "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>" +
-         "<path d='M5 3 a1 1 0 0 1 1-1 h8 l5 5 v14 a1 1 0 0 1 -1 1 H6 a1 1 0 0 1 -1-1 z' fill='#ffffff' stroke='#C7C7D6'/>" +
-         "<path d='M14 2 v5 a1 1 0 0 0 1 1 h4' fill='none' stroke='#C7C7D6'/>" +
-         "<rect x='8' y='12' width='8' height='1.6' rx='0.8' fill='#5B4FE0'/>" +
-         "<rect x='8' y='15' width='6' height='1.6' rx='0.8' fill='#9AA0AE'/></svg>"
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<path d='M11 6 a3 3 0 0 1 3-3 h16 l10 10 v26 a3 3 0 0 1 -3 3 H14 a3 3 0 0 1 -3-3 z' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<path d='M30 3 v8 a2 2 0 0 0 2 2 h8' fill='none' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<rect x='17' y='24' width='14' height='2.6' rx='1.3' fill='#7C71F2'/>" +
+         "<rect x='17' y='30' width='10' height='2.6' rx='1.3' fill='#AEB4C0'/></svg>"
 }
 
 // toolbar symbols (green), rasterized like the file icons
@@ -222,6 +229,21 @@ func keyChar(kmap, kc, shift) {
 
 // ── places (quick-access sidebar) ──────────────────────────────────────
 func homeDir() { emit chomp(exec("printf %s \"$HOME\"")) }
+
+// dark mode? config file wins (~/.config/cortex/config: theme=dark|light|auto),
+// else the system preference (gsettings color-scheme / gtk-theme), else light.
+func detectDark() {
+    let cfg = homeDir() + "/.config/cortex/config"
+    let t = chomp(exec("grep -iE '^[ ]*theme[ ]*=' '" + cfg + "' 2>/dev/null | head -1 | sed 's/[^=]*=//' | tr -d ' '"))
+    if t == "dark" { emit 1 }
+    if t == "light" { emit 0 }
+    // auto / unset -> system
+    let cs = exec("gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null")
+    if contains(cs, "dark") { emit 1 }
+    let gtk = exec("gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null")
+    if contains(gtk, "dark") || contains(gtk, "Dark") { emit 1 }
+    emit 0
+}
 func existsDir(p) { emit chomp(exec("test -d '" + p + "' && echo y")) == "y" }
 func bookmarksPath() { emit homeDir() + "/.config/cortex/bookmarks" }
 func addPlace(out, label, path) { emit out + label + "|" + path + "\n" }
@@ -296,13 +318,13 @@ func joinDir(cwd, name) {
 // borderless circular button that blends into the toolbar: a soft filled
 // circle (cBtn, a hair off the bar colour) with the green glyph composited
 // onto that same colour so its square corners vanish inside the circle.
-func drawBtn(fd, win, gcCircle, x, raw, scratch, haveIcons) {
+func drawBtn(fd, win, gcCircle, x, raw, scratch, haveIcons, dark) {
     let d = 34
     let off = (BTNW() - d) / 2
     x11FillArc(fd, win, gcCircle, x + off, btnY() + off, d, d, 0, 23040)
     if haveIcons == 1 {
         let io = (BTNW() - TBICON()) / 2
-        blitIcon(fd, win, gcCircle, x + io, btnY() + io, raw, scratch, cBtn(), TBICON())
+        blitIcon(fd, win, gcCircle, x + io, btnY() + io, raw, scratch, cBtn(dark), TBICON())
     }
 }
 
@@ -315,7 +337,7 @@ func addrShow(text, fieldW, focused) {
     emit "." + substring(t, len(t) - max + 1, len(t))
 }
 
-func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw) {
+func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) {
     let win = x11GenId(info, 1)
     let gcClear = x11GenId(info, 3)
     let gcBar = x11GenId(info, 4)
@@ -334,6 +356,7 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
     let gcAddr = x11GenId(info, 19)
     let gcAddrBd = x11GenId(info, 20)
     let gcBtnBd = x11GenId(info, 21)
+    let gcAddrTx = x11GenId(info, 22)
 
     // base + chrome
     x11FillRect(fd, win, gcClear, 0, 0, w, h)
@@ -346,16 +369,16 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
 
     // toolbar
     x11FillRect(fd, win, gcBar, 0, TITLEH(), w, TBARH())
-    drawBtn(fd, win, gcBtn, backX(), backRaw, scratch, haveIcons)
-    drawBtn(fd, win, gcBtn, fwdX(), fwdRaw, scratch, haveIcons)
-    drawBtn(fd, win, gcBtn, refX(), reloadRaw, scratch, haveIcons)
+    drawBtn(fd, win, gcBtn, backX(), backRaw, scratch, haveIcons, dark)
+    drawBtn(fd, win, gcBtn, fwdX(), fwdRaw, scratch, haveIcons, dark)
+    drawBtn(fd, win, gcBtn, refX(), reloadRaw, scratch, haveIcons, dark)
     // address field (aligned with the buttons)
     let afW = w - addrX() - 10
     x11FillRect(fd, win, gcAddrBd, addrX(), btnY(), afW, BTNW())
     x11FillRect(fd, win, gcAddr, addrX() + 1, btnY() + 1, afW - 2, BTNW() - 2)
     let shown = cwd
     if addrFocused == 1 { shown = addr }
-    x11ImageText8(fd, win, gcRow, addrX() + 8, btnY() + BTNW() / 2 + 4, addrShow(shown, afW - 12, addrFocused))
+    x11ImageText8(fd, win, gcAddrTx, addrX() + 8, btnY() + BTNW() / 2 + 4, addrShow(shown, afW - 12, addrFocused))
 
     // sidebar list (small icons)
     x11ImageText8(fd, win, gcSideTx, 12, TOP() + 17, "Quick access")
@@ -363,7 +386,7 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
     let p = 0
     while p < np {
         let y = TOP() + (p + 1) * ROWH()
-        if haveIcons == 1 { blitIcon(fd, win, gcRow, 10, y + 2, folderSml, scratch, cSide(), ICONSML()) }
+        if haveIcons == 1 { blitIcon(fd, win, gcRow, 10, y + 2, folderSml, scratch, cSide(dark), ICONSML()) }
         x11ImageText8(fd, win, gcSideTx, 36, y + 17, placeLabel(places, p))
         p += 1
     }
@@ -378,11 +401,11 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
         let rowi = i / cols
         let cx = bx + GRIDPAD() + col * CELLW()
         let cy = TOP() + GRIDPAD() + rowi * CELLH()
-        let bg = cWhite()
+        let bg = cBg(dark)
         let lblGc = gcRow
         if i == sel {
             x11FillRect(fd, win, gcSelBox, cx, cy, CELLW() - 8, CELLH() - 8)
-            bg = cSelLite()
+            bg = cSelLite(dark)
             lblGc = gcLblSel
         }
         let ix = cx + (CELLW() - ICONBIG()) / 2
@@ -404,9 +427,10 @@ just run {
     let info = x11Handshake(fd)
     if !x11Accepted(info) { print("cortex: handshake refused"); sockClose(fd); exit(1) }
 
+    let dark = detectDark()
     let root = x11Root(info)
     let win = x11GenId(info, 1)
-    x11CreateWindow(fd, win, root, 80, 60, W(), H(), cWhite(), 163845)
+    x11CreateWindow(fd, win, root, 80, 60, W(), H(), cBg(dark), 163845)
     // window identity so Hyprland/WMs can match it (class:cortex / title cortex)
     x11SetClass(fd, win, "cortex", "cortex")
     x11SetTitle(fd, win, "cortex")
@@ -419,23 +443,24 @@ just run {
     let font = x11GenId(info, 2)
     x11OpenFont(fd, font, "fixed")
 
-    let gcClear   = x11GenId(info, 3)   x11CreateGC(fd, gcClear,   win, cWhite(),   cWhite(),  font)
-    let gcBar     = x11GenId(info, 4)   x11CreateGC(fd, gcBar,     win, cToolbar(), cToolbar(),font)
-    let gcPath    = x11GenId(info, 5)   x11CreateGC(fd, gcPath,    win, cBlack(),   cBtn(),    font)
-    let gcRow     = x11GenId(info, 6)   x11CreateGC(fd, gcRow,     win, cBlack(),   cWhite(),  font)
-    let gcFolder  = x11GenId(info, 9)   x11CreateGC(fd, gcFolder,  win, cFolder(),  cWhite(),  font)
-    let gcFile    = x11GenId(info, 10)  x11CreateGC(fd, gcFile,    win, cFile(),    cWhite(),  font)
-    let gcSide    = x11GenId(info, 11)  x11CreateGC(fd, gcSide,    win, cSide(),    cSide(),   font)
-    let gcSideTx  = x11GenId(info, 12)  x11CreateGC(fd, gcSideTx,  win, cBlack(),   cSide(),   font)
-    let gcDiv     = x11GenId(info, 13)  x11CreateGC(fd, gcDiv,     win, cDivider(), cDivider(),font)
-    let gcSelBox  = x11GenId(info, 14)  x11CreateGC(fd, gcSelBox,  win, cSelLite(), cSelLite(),font)
-    let gcLblSel  = x11GenId(info, 15)  x11CreateGC(fd, gcLblSel,  win, cBlack(),   cSelLite(),font)
-    let gcTitle   = x11GenId(info, 16)  x11CreateGC(fd, gcTitle,   win, cTitle(),   cTitle(),  font)
-    let gcTitleTx = x11GenId(info, 17)  x11CreateGC(fd, gcTitleTx, win, cTitleTx(), cTitle(),  font)
-    let gcBtn     = x11GenId(info, 18)  x11CreateGC(fd, gcBtn,     win, cBtn(),     cBtn(),    font)
-    let gcAddr    = x11GenId(info, 19)  x11CreateGC(fd, gcAddr,    win, cAddr(),    cAddr(),   font)
-    let gcAddrBd  = x11GenId(info, 20)  x11CreateGC(fd, gcAddrBd,  win, cAddrBd(),  cAddrBd(), font)
-    let gcBtnBd   = x11GenId(info, 21)  x11CreateGC(fd, gcBtnBd,   win, cBtnBd(),   cBtnBd(),  font)
+    let gcClear   = x11GenId(info, 3)   x11CreateGC(fd, gcClear,   win, cBg(dark),     cBg(dark),     font)
+    let gcBar     = x11GenId(info, 4)   x11CreateGC(fd, gcBar,     win, cToolbar(dark),cToolbar(dark),font)
+    let gcPath    = x11GenId(info, 5)   x11CreateGC(fd, gcPath,    win, cText(dark),   cBtn(dark),    font)
+    let gcRow     = x11GenId(info, 6)   x11CreateGC(fd, gcRow,     win, cText(dark),   cBg(dark),     font)
+    let gcFolder  = x11GenId(info, 9)   x11CreateGC(fd, gcFolder,  win, cFolder(),     cBg(dark),     font)
+    let gcFile    = x11GenId(info, 10)  x11CreateGC(fd, gcFile,    win, cFile(),       cBg(dark),     font)
+    let gcSide    = x11GenId(info, 11)  x11CreateGC(fd, gcSide,    win, cSide(dark),   cSide(dark),   font)
+    let gcSideTx  = x11GenId(info, 12)  x11CreateGC(fd, gcSideTx,  win, cSideTx(dark), cSide(dark),   font)
+    let gcDiv     = x11GenId(info, 13)  x11CreateGC(fd, gcDiv,     win, cDivider(dark),cDivider(dark),font)
+    let gcSelBox  = x11GenId(info, 14)  x11CreateGC(fd, gcSelBox,  win, cSelLite(dark),cSelLite(dark),font)
+    let gcLblSel  = x11GenId(info, 15)  x11CreateGC(fd, gcLblSel,  win, cText(dark),   cSelLite(dark),font)
+    let gcTitle   = x11GenId(info, 16)  x11CreateGC(fd, gcTitle,   win, cTitle(dark),  cTitle(dark),  font)
+    let gcTitleTx = x11GenId(info, 17)  x11CreateGC(fd, gcTitleTx, win, cTitleTx(dark),cTitle(dark),  font)
+    let gcBtn     = x11GenId(info, 18)  x11CreateGC(fd, gcBtn,     win, cBtn(dark),    cBtn(dark),    font)
+    let gcAddr    = x11GenId(info, 19)  x11CreateGC(fd, gcAddr,    win, cAddr(dark),   cAddr(dark),   font)
+    let gcAddrBd  = x11GenId(info, 20)  x11CreateGC(fd, gcAddrBd,  win, cAddrBd(dark), cAddrBd(dark), font)
+    let gcBtnBd   = x11GenId(info, 21)  x11CreateGC(fd, gcBtnBd,   win, cBg(dark),     cBg(dark),     font)
+    let gcAddrTx  = x11GenId(info, 22)  x11CreateGC(fd, gcAddrTx,  win, cText(dark),   cAddr(dark),   font)
 
     x11MapWindow(fd, win)
 
@@ -491,11 +516,11 @@ just run {
         else {
             let t = x11EventType(ev)
             if t == 12 {
-                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw)
+                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
             } else if t == 22 {
                 curW = x11EventWidth(ev)
                 curH = x11EventHeight(ev)
-                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw)
+                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
             } else if t == 4 {
                 let ex = x11EventX(ev)
                 let ey = x11EventY(ev)
@@ -513,7 +538,7 @@ just run {
                         addrFocused = 1
                         addr = cwd
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
                 } else if ey >= TOP() {
                     addrFocused = 0
                     if ex < SIDEBAR() {
@@ -549,7 +574,7 @@ just run {
                             lastTime = time
                         }
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
                 }
             } else if t == 2 {
                 let kc = x11KeyDetail(ev)
@@ -574,7 +599,7 @@ just run {
                         let ch = keyChar(kmap, kc, shift)
                         if ch != "" { addr = addr + ch }
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
                 } else {
                     if kc == 9 { running = 0 }                                  // Esc
                     else if kc == 36 {                                          // Enter -> open sel
@@ -587,14 +612,14 @@ just run {
                             sel = 0
                             x11SetTitle(fd, win, "cortex - " + basename(cwd))
                         }
-                        repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw)
+                        repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
                     }
-                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  entries = buildEntries(cwd)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw) }
-                    else if kc == 56 { addBookmark(cwd)  places = buildPlaces()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw) }
-                    else if kc == 116 { let c = gridCols(curW)  if sel + c < countLines(entries) { sel = sel + c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw) }
-                    else if kc == 111 { let c = gridCols(curW)  if sel - c >= 0 { sel = sel - c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw) }
-                    else if kc == 114 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw) }
-                    else if kc == 113 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw) }
+                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  entries = buildEntries(cwd)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
+                    else if kc == 56 { addBookmark(cwd)  places = buildPlaces()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
+                    else if kc == 116 { let c = gridCols(curW)  if sel + c < countLines(entries) { sel = sel + c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
+                    else if kc == 111 { let c = gridCols(curW)  if sel - c >= 0 { sel = sel - c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
+                    else if kc == 114 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
+                    else if kc == 113 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
                 }
             } else if t == 33 {
                 // ClientMessage — WM close request (WM_DELETE_WINDOW @ data[12])
