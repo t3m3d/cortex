@@ -375,6 +375,12 @@ func removeBookmark(cwd) {
 func extractArchive(cwd, name) {
     exec("cd '" + cwd + "' && (bsdtar -xf '" + name + "' 2>/dev/null || tar xf '" + name + "' 2>/dev/null || unzip -o '" + name + "' 2>/dev/null)")
 }
+func duplicateEntry(cwd, name) {
+    exec("cd '" + cwd + "' && cp -r --backup=numbered '" + name + "' '" + name + ".copy' 2>/dev/null")
+}
+func compressEntry(cwd, name) {
+    exec("cd '" + cwd + "' && (zip -r -q '" + name + ".zip' '" + name + "' 2>/dev/null || tar czf '" + name + ".tar.gz' '" + name + "' 2>/dev/null)")
+}
 func openTerminal(cwd) {
     exec("cd '" + cwd + "' && setsid sh -c '${TERMINAL:-$(command -v ghostty kitty alacritty foot wezterm xterm 2>/dev/null | head -1)}' >/dev/null 2>&1 &")
 }
@@ -962,6 +968,8 @@ just run {
                     else if kc == 71 { allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  places = buildSidebar()  searchMode = 0  searchText = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // F5 refresh
                     else if kc == 40 && ctrl == 1 && shift == 1 { removeBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+Shift+D unbookmark
                     else if kc == 26 && ctrl == 1 { if sel >= 0 && sel < countLines(entries) && entryIsDir(entries, sel) == 0 { extractArchive(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+E extract
+                    else if kc == 40 && ctrl == 1 && shift == 0 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { duplicateEntry(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+D duplicate
+                    else if kc == 52 && ctrl == 1 && shift == 1 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { compressEntry(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+Shift+Z compress
                     else if kc == 36 {                                          // Enter -> open sel (dir) / open file
                         if entryIsDir(entries, sel) {
                             let name = entryName(entries, sel)
