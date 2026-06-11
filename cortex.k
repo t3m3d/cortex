@@ -35,8 +35,8 @@ func cAddrBd(d)   { emit pick(d, rgb(194,200,208), rgb(60,65,75)) }
 func cSide(d)     { emit pick(d, rgb(241,243,245), rgb(32,35,41)) }
 func cSideTx(d)   { emit pick(d, rgb(60,64,67),    rgb(192,197,205)) }
 func cDivider(d)  { emit pick(d, rgb(214,219,224), rgb(51,55,63)) }
-func cSel(d)      { emit pick(d, rgb(62,151,255),  rgb(62,151,255)) }
-func cSelLite(d)  { emit pick(d, rgb(220,233,255), rgb(44,58,87)) }
+func cSel(d)      { emit pick(d, rgb(31,164,99),   rgb(52,199,126)) }   // krypton green
+func cSelLite(d)  { emit pick(d, rgb(216,242,228), rgb(26,58,44)) }     // soft green selection
 func ICONSML()   { emit 20 }
 func ICONBIG()   { emit 96 }
 func CELLW()     { emit 160 }
@@ -56,15 +56,15 @@ func addrX()  { emit 142 }
 func folderSvg() {
     emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
          "<defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'>" +
-         "<stop offset='0' stop-color='#8579F6'/><stop offset='1' stop-color='#5E50E6'/></linearGradient></defs>" +
-         "<path d='M7 14 a3 3 0 0 1 3-3 h8.3 a2.5 2.5 0 0 1 1.8 0.75 l2.6 2.6 a2.5 2.5 0 0 0 1.8 0.75 H38 a3 3 0 0 1 3 3 v14 a3 3 0 0 1 -3 3 H10 a3 3 0 0 1 -3-3 z' fill='#4B40C7'/>" +
+         "<stop offset='0' stop-color='#34C77E'/><stop offset='1' stop-color='#1E9E5E'/></linearGradient></defs>" +
+         "<path d='M7 14 a3 3 0 0 1 3-3 h8.3 a2.5 2.5 0 0 1 1.8 0.75 l2.6 2.6 a2.5 2.5 0 0 0 1.8 0.75 H38 a3 3 0 0 1 3 3 v14 a3 3 0 0 1 -3 3 H10 a3 3 0 0 1 -3-3 z' fill='#15814E'/>" +
          "<path d='M6 23 a3 3 0 0 1 3-3 h30 a3 3 0 0 1 3 3 v11 a3 3 0 0 1 -3 3 H9 a3 3 0 0 1 -3-3 z' fill='url(#g)'/></svg>"
 }
 func fileSvg() {
     emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
          "<path d='M11 6 a3 3 0 0 1 3-3 h16 l10 10 v26 a3 3 0 0 1 -3 3 H14 a3 3 0 0 1 -3-3 z' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
          "<path d='M30 3 v8 a2 2 0 0 0 2 2 h8' fill='none' stroke='#D2D5DE' stroke-width='1.5'/>" +
-         "<rect x='17' y='24' width='14' height='2.6' rx='1.3' fill='#7C71F2'/>" +
+         "<rect x='17' y='24' width='14' height='2.6' rx='1.3' fill='#1FA463'/>" +
          "<rect x='17' y='30' width='10' height='2.6' rx='1.3' fill='#AEB4C0'/></svg>"
 }
 
