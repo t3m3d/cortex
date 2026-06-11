@@ -359,9 +359,12 @@ func openTerminal(cwd) {
     exec("cd '" + cwd + "' && setsid sh -c '${TERMINAL:-$(command -v ghostty kitty alacritty foot wezterm xterm 2>/dev/null | head -1)}' >/dev/null 2>&1 &")
 }
 
-func buildEntries(cwd, showHidden) {
+func sortName(m) { if m == 1 { emit "size" }  if m == 2 { emit "date" }  emit "name" }
+func buildEntries(cwd, showHidden, sortMode) {
     let flag = "-1p"
-    if showHidden == 1 { flag = "-1Ap" }
+    if showHidden == 1 { flag = flag + "A" }
+    if sortMode == 1 { flag = flag + "S" }   // size
+    if sortMode == 2 { flag = flag + "t" }   // date
     let raw = exec("ls " + flag + " '" + cwd + "' 2>/dev/null")
     let out = "d ..\n"
     let line = ""
@@ -634,7 +637,8 @@ just run {
 
     let cwd = chomp(exec("pwd"))
     let showHidden = 0
-    let entries = buildEntries(cwd, showHidden)
+    let sortMode = 0
+    let entries = buildEntries(cwd, showHidden, sortMode)
     let places = buildSidebar()
     let sel = 0
     let scroll = 0
@@ -683,11 +687,11 @@ just run {
                     // toolbar
                     addrFocused = 0
                     if ex >= backX() && ex < backX() + BTNW() {
-                        if histIdx > 0 { histIdx = histIdx - 1  cwd = nthLine(hist, histIdx)  entries = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }
+                        if histIdx > 0 { histIdx = histIdx - 1  cwd = nthLine(hist, histIdx)  entries = buildEntries(cwd, showHidden, sortMode)  sel = 0  scroll = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }
                     } else if ex >= fwdX() && ex < fwdX() + BTNW() {
-                        if histIdx < countLines(hist) - 1 { histIdx = histIdx + 1  cwd = nthLine(hist, histIdx)  entries = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }
+                        if histIdx < countLines(hist) - 1 { histIdx = histIdx + 1  cwd = nthLine(hist, histIdx)  entries = buildEntries(cwd, showHidden, sortMode)  sel = 0  scroll = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }
                     } else if ex >= refX() && ex < refX() + BTNW() {
-                        entries = buildEntries(cwd, showHidden)
+                        entries = buildEntries(cwd, showHidden, sortMode)
                         places = buildSidebar()
                     } else if ex >= addrX() {
                         addrFocused = 1
@@ -711,7 +715,7 @@ just run {
                                 cwd = dest
                                 hist = truncLines(hist, histIdx + 1) + cwd + "\n"
                                 histIdx = countLines(hist) - 1
-                                entries = buildEntries(cwd, showHidden)
+                                entries = buildEntries(cwd, showHidden, sortMode)
                                 sel = 0  scroll = 0
                                 places = buildSidebar()
                                 x11SetTitle(fd, win, "cortex - " + basename(cwd))
@@ -733,7 +737,7 @@ just run {
                                     cwd = dst
                                     hist = truncLines(hist, histIdx + 1) + cwd + "\n"
                                     histIdx = countLines(hist) - 1
-                                    entries = buildEntries(cwd, showHidden)
+                                    entries = buildEntries(cwd, showHidden, sortMode)
                                     sel = 0  scroll = 0
                                     x11SetTitle(fd, win, "cortex - " + basename(cwd))
                                 } else {
@@ -757,7 +761,7 @@ just run {
                     else if kc == 36 {                                          // Enter commit
                         if renameText != "" {
                             renameTo(cwd, entryName(entries, sel), renameText)
-                            entries = buildEntries(cwd, showHidden)
+                            entries = buildEntries(cwd, showHidden, sortMode)
                         }
                         renaming = 0
                     }
@@ -775,7 +779,7 @@ just run {
                             cwd = chomp(addr)
                             hist = truncLines(hist, histIdx + 1) + cwd + "\n"
                             histIdx = countLines(hist) - 1
-                            entries = buildEntries(cwd, showHidden)
+                            entries = buildEntries(cwd, showHidden, sortMode)
                             sel = 0  scroll = 0
                             x11SetTitle(fd, win, "cortex - " + basename(cwd))
                         }
@@ -795,28 +799,29 @@ just run {
                             if name == ".." { cwd = parentDir(cwd) } else { cwd = joinDir(cwd, name) }
                             hist = truncLines(hist, histIdx + 1) + cwd + "\n"
                             histIdx = countLines(hist) - 1
-                            entries = buildEntries(cwd, showHidden)
+                            entries = buildEntries(cwd, showHidden, sortMode)
                             sel = 0  scroll = 0
                             x11SetTitle(fd, win, "cortex - " + basename(cwd))
                         } else { openFile(joinDir(cwd, entryName(entries, sel))) }
                         repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText)
                     }
-                    else if kc == 43 && ctrl == 1 { if showHidden == 1 { showHidden = 0 } else { showHidden = 1 }  entries = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // Ctrl+H hidden
-                    else if kc == 57 && ctrl == 1 && shift == 1 { newFolder(cwd)  entries = buildEntries(cwd, showHidden)  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // n new folder
+                    else if kc == 43 && ctrl == 1 { if showHidden == 1 { showHidden = 0 } else { showHidden = 1 }  entries = buildEntries(cwd, showHidden, sortMode)  sel = 0  scroll = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // Ctrl+H hidden
+                    else if kc == 39 && ctrl == 1 { sortMode = sortMode + 1  if sortMode > 2 { sortMode = 0 }  entries = buildEntries(cwd, showHidden, sortMode)  sel = 0  scroll = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd) + " [" + sortName(sortMode) + "]")  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // Ctrl+S cycle sort
+                    else if kc == 57 && ctrl == 1 && shift == 1 { newFolder(cwd)  entries = buildEntries(cwd, showHidden, sortMode)  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // n new folder
                     else if kc == 70 { openTerminal(cwd) }                       // F4 terminal here
                     else if kc == 68 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { renaming = 1  renameText = entryName(entries, sel) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // F2 rename
-                    else if kc == 119 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  entries = buildEntries(cwd, showHidden)  if sel >= countLines(entries) { sel = countLines(entries) - 1 } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // Delete -> trash
+                    else if kc == 119 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  entries = buildEntries(cwd, showHidden, sortMode)  if sel >= countLines(entries) { sel = countLines(entries) - 1 } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // Delete -> trash
                     else if kc == 54 && ctrl == 1 { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } }  // Ctrl+C
                     else if kc == 53 && ctrl == 1 { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "cut" } }   // Ctrl+X
                     else if kc == 55 && ctrl == 1 {                                                                            // Ctrl+V paste
                         if clipboard != "" {
                             if clipOp == "cut" { exec("mv '" + clipboard + "' '" + cwd + "/' 2>/dev/null")  clipboard = ""  clipOp = "" }
                             else { exec("cp -r '" + clipboard + "' '" + cwd + "/' 2>/dev/null") }
-                            entries = buildEntries(cwd, showHidden)
+                            entries = buildEntries(cwd, showHidden, sortMode)
                         }
                         repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText)
                     }
-                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  entries = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
+                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  entries = buildEntries(cwd, showHidden, sortMode)  sel = 0  scroll = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
                     else if kc == 40 && ctrl == 1 { addBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
                     else if kc == 116 { let c = gridCols(curW)  if sel + c < countLines(entries) { sel = sel + c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
                     else if kc == 111 { let c = gridCols(curW)  if sel - c >= 0 { sel = sel - c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
