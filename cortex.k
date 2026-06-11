@@ -24,9 +24,9 @@ func cFolder()   { emit 15909198 }   // 0xF2C14E (fallback rect)
 func cFile()     { emit 12434877 }   // 0xBDB7BD (fallback rect)
 func cSelLite()  { emit 14478847 }   // 0xDCE9FF light selection (grid)
 func ICONSML()   { emit 20 }         // sidebar icon
-func ICONBIG()   { emit 64 }         // main-grid icon
-func CELLW()     { emit 128 }
-func CELLH()     { emit 116 }
+func ICONBIG()   { emit 96 }         // main-grid icon
+func CELLW()     { emit 160 }
+func CELLH()     { emit 150 }
 func GRIDPAD()   { emit 16 }
 func charW()     { emit 6 }          // "fixed" font advance
 
@@ -70,7 +70,9 @@ func rasterHex(name, svg, sz) {
     let svgf = dir + "/" + name + ".svg"
     let hexf = dir + "/" + name + "-" + sz + ".hex"
     writeFile(svgf, svg)
-    exec("convert -background none '" + svgf + "' -resize " + sz + "x" + sz + " -depth 8 BGRA:- 2>/dev/null | xxd -p -c 0 > '" + hexf + "'")
+    // -density sz*4 renders the 24px-viewBox SVG natively at `sz` (crisp),
+    // instead of rasterizing at 24 and upscaling (soft).
+    exec("convert -background none -density " + (sz * 4) + " '" + svgf + "' -resize " + sz + "x" + sz + " -depth 8 BGRA:- 2>/dev/null | xxd -p -c 0 > '" + hexf + "'")
     emit chomp(readFile(hexf))
 }
 func iconBytes(sz) { emit sz * sz * 4 }
