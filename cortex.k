@@ -430,21 +430,22 @@ func buildEntries(cwd, showHidden, sortMode) {
     if sortMode == 1 { flag = flag + "S" }   // size
     if sortMode == 2 { flag = flag + "t" }   // date
     let raw = exec("ls " + flag + " '" + cwd + "' 2>/dev/null")
-    let out = "d ..\n"
+    let dirs = ""
+    let files = ""
     let line = ""
     let i = 0
     while i < len(raw) {
         let ch = raw[i]
         if ch == fromCharCode(10) {
             if line != "" {
-                if line[len(line) - 1] == "/" { out = out + "d " + substring(line, 0, len(line) - 1) + "\n" }
-                else { out = out + "f " + line + "\n" }
+                if line[len(line) - 1] == "/" { dirs = dirs + "d " + substring(line, 0, len(line) - 1) + "\n" }
+                else { files = files + "f " + line + "\n" }
             }
             line = ""
         } else { line = line + ch }
         i += 1
     }
-    emit out
+    emit "d ..\n" + dirs + files
 }
 func entryIsDir(entries, row) { emit nthLine(entries, row)[0] == "d" }
 func entryName(entries, row)  { let l = nthLine(entries, row)  emit substring(l, 2, len(l)) }
