@@ -382,6 +382,27 @@ func buildEntries(cwd, showHidden) {
 func entryIsDir(entries, row) { emit nthLine(entries, row)[0] == "d" }
 func entryName(entries, row)  { let l = nthLine(entries, row)  emit substring(l, 2, len(l)) }
 
+func lc1(c) { if c >= "A" && c <= "Z" { emit fromCharCode(charCode(c) + 32) }  emit c }
+func hasPrefixCI(s, p) {
+    if len(p) > len(s) { emit 0 }
+    let i = 0
+    while i < len(p) {
+        if lc1(s[i]) != lc1(p[i]) { emit 0 }
+        i += 1
+    }
+    emit 1
+}
+// first entry index whose name starts with `prefix` (case-insensitive), or -1
+func findPrefix(entries, prefix) {
+    let n = countLines(entries)
+    let i = 0
+    while i < n {
+        if hasPrefixCI(entryName(entries, i), prefix) == 1 { emit i }
+        i += 1
+    }
+    emit 0 - 1
+}
+
 func buildStatus(cwd, entries) {
     let n = countLines(entries) - 1   // minus ".."
     if n < 0 { n = 0 }
@@ -621,6 +642,8 @@ just run {
     let renameText = ""
     let clipboard = ""
     let clipOp = ""
+    let typeBuf = ""
+    let typeTime = 0
     let lastRow = 0 - 1
     let lastTime = 0
     let curW = W()
@@ -779,8 +802,8 @@ just run {
                         repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText)
                     }
                     else if kc == 43 && ctrl == 1 { if showHidden == 1 { showHidden = 0 } else { showHidden = 1 }  entries = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // Ctrl+H hidden
-                    else if kc == 57 { newFolder(cwd)  entries = buildEntries(cwd, showHidden)  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // n new folder
-                    else if kc == 28 { openTerminal(cwd) }                       // t terminal here
+                    else if kc == 57 && ctrl == 1 && shift == 1 { newFolder(cwd)  entries = buildEntries(cwd, showHidden)  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // n new folder
+                    else if kc == 70 { openTerminal(cwd) }                       // F4 terminal here
                     else if kc == 68 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { renaming = 1  renameText = entryName(entries, sel) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // F2 rename
                     else if kc == 119 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  entries = buildEntries(cwd, showHidden)  if sel >= countLines(entries) { sel = countLines(entries) - 1 } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // Delete -> trash
                     else if kc == 54 && ctrl == 1 { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } }  // Ctrl+C
@@ -794,7 +817,7 @@ just run {
                         repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText)
                     }
                     else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  entries = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
-                    else if kc == 56 { addBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
+                    else if kc == 40 && ctrl == 1 { addBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
                     else if kc == 116 { let c = gridCols(curW)  if sel + c < countLines(entries) { sel = sel + c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
                     else if kc == 111 { let c = gridCols(curW)  if sel - c >= 0 { sel = sel - c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
                     else if kc == 114 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }
@@ -803,6 +826,25 @@ just run {
                     else if kc == 112 { let vh = curH - STATUSH() - TOP() - GRIDPAD()  let pg = vh / CELLH()  if pg < 1 { pg = 1 }  scroll = scroll - pg  if scroll < 0 { scroll = 0 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // PageUp
                     else if kc == 110 { scroll = 0  sel = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // Home
                     else if kc == 115 { let ms = maxScroll(countLines(entries), gridCols(curW), curH - STATUSH() - TOP() - GRIDPAD())  scroll = ms  if countLines(entries) > 0 { sel = countLines(entries) - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText) }  // End
+                    else if ctrl == 0 {
+                        // type-ahead: jump selection to the first matching name
+                        let ch = keyChar(kmap, kc, shift)
+                        if ch != "" {
+                            let now = bufGetDwordAt(ev, 4)
+                            if now - typeTime > 1000 { typeBuf = "" }
+                            typeTime = now
+                            typeBuf = typeBuf + ch
+                            let found = findPrefix(entries, typeBuf)
+                            if found >= 0 {
+                                sel = found
+                                let rowi = found / gridCols(curW)
+                                let vis = (curH - STATUSH() - TOP() - GRIDPAD()) / CELLH()
+                                if rowi < scroll { scroll = rowi }
+                                if rowi >= scroll + vis { scroll = rowi - vis + 1 }
+                            }
+                            repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText)
+                        }
+                    }
                 }
             } else if t == 33 {
                 // ClientMessage — WM close request (WM_DELETE_WINDOW @ data[12])
