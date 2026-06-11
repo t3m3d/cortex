@@ -368,6 +368,13 @@ func copyPath(path) { exec("printf '%s' '" + path + "' | wl-copy 2>/dev/null || 
 func showProps(path, name) {
     exec("notify-send -a cortex 'cortex — " + name + "' \"$(stat --printf 'Size: %s bytes\\nType: %F\\nPerms: %A\\nModified: %y' '" + path + "' 2>/dev/null)\" 2>/dev/null")
 }
+func removeBookmark(cwd) {
+    let bp = bookmarksPath()
+    exec("grep -vxF '" + cwd + "' '" + bp + "' > '" + bp + ".tmp' 2>/dev/null && mv '" + bp + ".tmp' '" + bp + "' 2>/dev/null")
+}
+func extractArchive(cwd, name) {
+    exec("cd '" + cwd + "' && (bsdtar -xf '" + name + "' 2>/dev/null || tar xf '" + name + "' 2>/dev/null || unzip -o '" + name + "' 2>/dev/null)")
+}
 func openTerminal(cwd) {
     exec("cd '" + cwd + "' && setsid sh -c '${TERMINAL:-$(command -v ghostty kitty alacritty foot wezterm xterm 2>/dev/null | head -1)}' >/dev/null 2>&1 &")
 }
@@ -952,6 +959,9 @@ just run {
                     else if kc == 67 { if helpOpen == 1 { helpOpen = 0 } else { helpOpen = 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // F1 help
                     else if kc == 46 && ctrl == 1 { addrFocused = 1  addr = cwd  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+L address
                     else if kc == 41 && ctrl == 1 { searchMode = 1  searchText = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+F search
+                    else if kc == 71 { allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  places = buildSidebar()  searchMode = 0  searchText = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // F5 refresh
+                    else if kc == 40 && ctrl == 1 && shift == 1 { removeBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+Shift+D unbookmark
+                    else if kc == 26 && ctrl == 1 { if sel >= 0 && sel < countLines(entries) && entryIsDir(entries, sel) == 0 { extractArchive(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+E extract
                     else if kc == 36 {                                          // Enter -> open sel (dir) / open file
                         if entryIsDir(entries, sel) {
                             let name = entryName(entries, sel)
