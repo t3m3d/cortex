@@ -687,9 +687,11 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
         if kind == "h" {
             x11ImageText8(fd, win, gcSideTx, 12, y + 17, fieldAt(line, 1))
         } else {
+            let rowBg = cSide(dark)
+            if fieldAt(line, 2) == cwd { x11FillRect(fd, win, gcSelBox, 0, y, SIDEBAR(), ROWH())  rowBg = cSelLite(dark) }
             if haveIcons == 1 {
-                if kind == "d" { blitIcon(fd, win, gcRow, 10, y + 2, driveSml, scratch, cSide(dark), ICONSML()) }
-                else { blitIcon(fd, win, gcRow, 10, y + 2, folderSml, scratch, cSide(dark), ICONSML()) }
+                if kind == "d" { blitIcon(fd, win, gcRow, 10, y + 2, driveSml, scratch, rowBg, ICONSML()) }
+                else { blitIcon(fd, win, gcRow, 10, y + 2, folderSml, scratch, rowBg, ICONSML()) }
             }
             x11ImageText8(fd, win, gcSideTx, 36, y + 17, fieldAt(line, 1))
         }
