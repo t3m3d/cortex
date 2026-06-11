@@ -20,8 +20,74 @@ func cToolbar()  { emit 14211288 }   // 0xD8E0E8
 func cSide()     { emit 15660020 }   // 0xEEF1F4 sidebar bg
 func cDivider()  { emit 13160660 }   // 0xC8CED4
 func cSel()      { emit 4101887 }    // 0x3E97FF
-func cFolder()   { emit 15909198 }   // 0xF2C14E
-func cFile()     { emit 12434877 }   // 0xBDB7BD
+func cFolder()   { emit 15909198 }   // 0xF2C14E (fallback rect)
+func cFile()     { emit 12434877 }   // 0xBDB7BD (fallback rect)
+func ICONSZ()    { emit 20 }
+
+// ── custom cortex icons (edit these SVGs to restyle — distinct on purpose) ─
+// Indigo rounded folder; white page-with-fold + indigo accent. Rasterized at
+// runtime via ImageMagick (convert) to raw BGRA, alpha-composited onto each
+// row background, blitted with x11PutImage.
+func folderSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>" +
+         "<path d='M2 7 a2 2 0 0 1 2-2 h5 l2 2 h9 a2 2 0 0 1 2 2 v8 a2 2 0 0 1 -2 2 H4 a2 2 0 0 1 -2-2 z' fill='#5B4FE0'/>" +
+         "<path d='M2 10 h20 v7 a2 2 0 0 1 -2 2 H4 a2 2 0 0 1 -2-2 z' fill='#7C71F2'/></svg>"
+}
+func fileSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>" +
+         "<path d='M5 3 a1 1 0 0 1 1-1 h8 l5 5 v14 a1 1 0 0 1 -1 1 H6 a1 1 0 0 1 -1-1 z' fill='#ffffff' stroke='#C7C7D6'/>" +
+         "<path d='M14 2 v5 a1 1 0 0 0 1 1 h4' fill='none' stroke='#C7C7D6'/>" +
+         "<rect x='8' y='12' width='8' height='1.6' rx='0.8' fill='#5B4FE0'/>" +
+         "<rect x='8' y='15' width='6' height='1.6' rx='0.8' fill='#9AA0AE'/></svg>"
+}
+
+func hexNyb(c) {
+    if c >= "0" && c <= "9" { emit charCode(c) - 48 }
+    emit charCode(c) - 87   // a-f -> 10-15
+}
+func hexToBuf(hex, nbytes) {
+    let b = bufNew(nbytes)
+    let i = 0
+    while i < nbytes {
+        bufSetByte(b, i, hexNyb(hex[i * 2]) * 16 + hexNyb(hex[i * 2 + 1]))
+        i += 1
+    }
+    emit b
+}
+// Rasterize an embedded SVG to BGRA hex (ICONSZ x ICONSZ), regenerated each
+// launch so edits show immediately. Returns the hex string ("" if convert/xxd
+// missing). len() works on the string (len() on a buf always returns 0, so we
+// gate on the hex length, not the decoded buffer).
+func rasterHex(name, svg) {
+    let dir = homeDir() + "/.cache/cortex"
+    exec("mkdir -p '" + dir + "'")
+    let svgf = dir + "/" + name + ".svg"
+    writeFile(svgf, svg)
+    let sz = ICONSZ()
+    emit chomp(exec("convert -background none '" + svgf + "' -resize " + sz + "x" + sz + " -depth 8 BGRA:- 2>/dev/null | xxd -p -c 0"))
+}
+func iconBytes() { emit ICONSZ() * ICONSZ() * 4 }
+
+// Alpha-composite raw BGRA over a solid bg pixel into `pix` (BGRX), then blit.
+func blitIcon(fd, win, gc, x, y, raw, scratch, bg) {
+    let sz = ICONSZ()
+    let bgB = bg - bg / 256 * 256
+    let bgG = bg / 256 - bg / 65536 * 256
+    let bgR = bg / 65536 - bg / 65536 / 256 * 256
+    let npx = sz * sz
+    let i = 0
+    while i < npx {
+        let o = i * 4
+        let a = bufGetByte(raw, o + 3)
+        let ia = 255 - a
+        bufSetByte(scratch, o,     (bufGetByte(raw, o) * a + bgB * ia) / 255)
+        bufSetByte(scratch, o + 1, (bufGetByte(raw, o + 1) * a + bgG * ia) / 255)
+        bufSetByte(scratch, o + 2, (bufGetByte(raw, o + 2) * a + bgR * ia) / 255)
+        bufSetByte(scratch, o + 3, 0)
+        i += 1
+    }
+    x11PutImage(fd, win, gc, x, y, sz, sz, scratch)
+}
 
 // ── string helpers ─────────────────────────────────────────────────────
 func nthLine(s, idx) {
@@ -161,7 +227,7 @@ func drawFile(fd, win, gc, x, y) {
     x11FillRect(fd, win, gc, x + 3, y + 3, 14, 15)
 }
 
-func repaint(fd, info, cwd, entries, sel, places, w, h) {
+func repaint(fd, info, cwd, entries, sel, places, w, h, folderRaw, fileRaw, scratch, haveIcons) {
     let win = x11GenId(info, 1)
     let gcClear = x11GenId(info, 3)
     let gcBar = x11GenId(info, 4)
@@ -190,7 +256,8 @@ func repaint(fd, info, cwd, entries, sel, places, w, h) {
     let p = 0
     while p < np {
         let y = TOOLBAR() + (p + 1) * ROWH()
-        drawFolder(fd, win, gcFolder, 10, y)
+        if haveIcons == 1 { blitIcon(fd, win, gcRow, 10, y + 2, folderRaw, scratch, cSide()) }
+        else { drawFolder(fd, win, gcFolder, 10, y) }
         x11ImageText8(fd, win, gcSideTx, 36, y + 17, placeLabel(places, p))
         p += 1
     }
@@ -202,12 +269,19 @@ func repaint(fd, info, cwd, entries, sel, places, w, h) {
     while i < nrows {
         let y = TOOLBAR() + i * ROWH()
         let textGc = gcRow
+        let rb = cWhite()
         if i == sel {
             x11FillRect(fd, win, gcSelFill, bx, y, w - bx, ROWH())
             textGc = gcSel
+            rb = cSel()
         }
-        if entryIsDir(entries, i) { drawFolder(fd, win, gcFolder, bx + ICONX(), y) }
-        else { drawFile(fd, win, gcFile, bx + ICONX(), y) }
+        if entryIsDir(entries, i) {
+            if haveIcons == 1 { blitIcon(fd, win, gcRow, bx + ICONX(), y + 2, folderRaw, scratch, rb) }
+            else { drawFolder(fd, win, gcFolder, bx + ICONX(), y) }
+        } else {
+            if haveIcons == 1 { blitIcon(fd, win, gcRow, bx + ICONX(), y + 2, fileRaw, scratch, rb) }
+            else { drawFile(fd, win, gcFile, bx + ICONX(), y) }
+        }
         x11ImageText8(fd, win, textGc, bx + 40, y + 17, entryName(entries, i))
         i += 1
     }
@@ -242,6 +316,18 @@ just run {
 
     x11MapWindow(fd, win)
 
+    let folderHex = rasterHex("folder", folderSvg())
+    let fileHex = rasterHex("file", fileSvg())
+    let haveIcons = 0
+    let folderRaw = bufNew(iconBytes())
+    let fileRaw = bufNew(iconBytes())
+    if len(folderHex) >= iconBytes() * 2 && len(fileHex) >= iconBytes() * 2 {
+        haveIcons = 1
+        folderRaw = hexToBuf(folderHex, iconBytes())
+        fileRaw = hexToBuf(fileHex, iconBytes())
+    }
+    let scratch = bufNew(iconBytes())
+
     let cwd = chomp(exec("pwd"))
     let entries = buildEntries(cwd)
     let places = buildPlaces()
@@ -259,12 +345,12 @@ just run {
         else {
             let t = x11EventType(ev)
             if t == 12 {
-                repaint(fd, info, cwd, entries, sel, places, curW, curH)
+                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderRaw, fileRaw, scratch, haveIcons)
             } else if t == 22 {
                 // ConfigureNotify: window resized — width@20, height@22.
                 curW = x11EventWidth(ev)
                 curH = x11EventHeight(ev)
-                repaint(fd, info, cwd, entries, sel, places, curW, curH)
+                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderRaw, fileRaw, scratch, haveIcons)
             } else if t == 4 {
                 let ex = x11EventX(ev)
                 let ey = x11EventY(ev)
@@ -277,7 +363,7 @@ just run {
                             cwd = placePath(places, pr)
                             entries = buildEntries(cwd)
                             sel = 0
-                            repaint(fd, info, cwd, entries, sel, places, curW, curH)
+                            repaint(fd, info, cwd, entries, sel, places, curW, curH, folderRaw, fileRaw, scratch, haveIcons)
                         }
                     } else {
                         let row = (ey - TOOLBAR()) / ROWH()
@@ -292,7 +378,7 @@ just run {
                             }
                             lastRow = row
                             lastTime = time
-                            repaint(fd, info, cwd, entries, sel, places, curW, curH)
+                            repaint(fd, info, cwd, entries, sel, places, curW, curH, folderRaw, fileRaw, scratch, haveIcons)
                         }
                     }
                 }
@@ -306,12 +392,12 @@ just run {
                         entries = buildEntries(cwd)
                         sel = 0
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderRaw, fileRaw, scratch, haveIcons)
                 }
-                else if kc == 22 { cwd = parentDir(cwd)  entries = buildEntries(cwd)  sel = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH) }   // Backspace
-                else if kc == 56 { addBookmark(cwd)  places = buildPlaces()  repaint(fd, info, cwd, entries, sel, places, curW, curH) }                     // 'b'
-                else if kc == 116 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH) }               // Down
-                else if kc == 111 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH) }                               // Up
+                else if kc == 22 { cwd = parentDir(cwd)  entries = buildEntries(cwd)  sel = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderRaw, fileRaw, scratch, haveIcons) }   // Backspace
+                else if kc == 56 { addBookmark(cwd)  places = buildPlaces()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderRaw, fileRaw, scratch, haveIcons) }                     // 'b'
+                else if kc == 116 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderRaw, fileRaw, scratch, haveIcons) }               // Down
+                else if kc == 111 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderRaw, fileRaw, scratch, haveIcons) }                               // Up
             } else if t == 0 {
                 print("cortex: X error code=" + bufGetByte(ev, 1) + " major=" + bufGetByte(ev, 10))
                 running = 0
