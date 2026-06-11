@@ -360,6 +360,11 @@ func openFile(path) { exec("setsid xdg-open '" + path + "' >/dev/null 2>&1 &") }
 func newFolder(cwd) { exec("mkdir -p '" + cwd + "/New Folder'") }
 func renameTo(cwd, old, nw) { exec("mv -n '" + cwd + "/" + old + "' '" + cwd + "/" + nw + "' 2>/dev/null") }
 func trashItem(path) { exec("gio trash '" + path + "' 2>/dev/null || trash-put '" + path + "' 2>/dev/null || true") }
+func newFile(cwd) { exec("touch '" + cwd + "/New File'") }
+func copyPath(path) { exec("printf '%s' '" + path + "' | wl-copy 2>/dev/null || printf '%s' '" + path + "' | xclip -sel clip 2>/dev/null") }
+func showProps(path, name) {
+    exec("notify-send -a cortex 'cortex — " + name + "' \"$(stat --printf 'Size: %s bytes\\nType: %F\\nPerms: %A\\nModified: %y' '" + path + "' 2>/dev/null)\" 2>/dev/null")
+}
 func openTerminal(cwd) {
     exec("cd '" + cwd + "' && setsid sh -c '${TERMINAL:-$(command -v ghostty kitty alacritty foot wezterm xterm 2>/dev/null | head -1)}' >/dev/null 2>&1 &")
 }
@@ -890,12 +895,15 @@ just run {
                     }
                     else if kc == 43 && ctrl == 1 { if showHidden == 1 { showHidden = 0 } else { showHidden = 1 }  entries = buildEntries(cwd, showHidden, sortMode)  sel = 0  scroll = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY) }  // Ctrl+H hidden
                     else if kc == 39 && ctrl == 1 { sortMode = sortMode + 1  if sortMode > 2 { sortMode = 0 }  entries = buildEntries(cwd, showHidden, sortMode)  sel = 0  scroll = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd) + " [" + sortName(sortMode) + "]")  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY) }  // Ctrl+S cycle sort
+                    else if kc == 31 && ctrl == 1 { if sel >= 0 && sel < countLines(entries) { showProps(joinDir(cwd, entryName(entries, sel)), entryName(entries, sel)) } }  // Ctrl+I properties
+                    else if kc == 57 && ctrl == 1 && shift == 0 { newFile(cwd)  entries = buildEntries(cwd, showHidden, sortMode)  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY) }  // Ctrl+N new file
+                    else if kc == 54 && ctrl == 1 && shift == 1 { if sel >= 0 && sel < countLines(entries) { copyPath(joinDir(cwd, entryName(entries, sel))) } }  // Ctrl+Shift+C copy path
                     else if kc == 57 && ctrl == 1 && shift == 1 { newFolder(cwd)  entries = buildEntries(cwd, showHidden, sortMode)  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY) }  // n new folder
                     else if kc == 70 { openTerminal(cwd) }                       // F4 terminal here
                     else if kc == 68 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { renaming = 1  renameText = entryName(entries, sel) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY) }  // F2 rename
                     else if kc == 119 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  entries = buildEntries(cwd, showHidden, sortMode)  if sel >= countLines(entries) { sel = countLines(entries) - 1 } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY) }  // Delete -> trash
-                    else if kc == 54 && ctrl == 1 { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } }  // Ctrl+C
-                    else if kc == 53 && ctrl == 1 { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "cut" } }   // Ctrl+X
+                    else if kc == 54 && ctrl == 1 && shift == 0 { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } }  // Ctrl+C
+                    else if kc == 53 && ctrl == 1 && shift == 0 { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "cut" } }   // Ctrl+X
                     else if kc == 55 && ctrl == 1 {                                                                            // Ctrl+V paste
                         if clipboard != "" {
                             if clipOp == "cut" { exec("mv '" + clipboard + "' '" + cwd + "/' 2>/dev/null")  clipboard = ""  clipOp = "" }
