@@ -306,11 +306,11 @@ func fieldAt(s, n) {
     emit ""
 }
 
-// Mounted external/removable drives: dirs under the usual auto-mount roots
-// that are actually mountpoints (checked against /proc/self/mounts). One
-// "label|mountpoint" per line. Re-scanned so hot-plugged drives appear.
+// External/removable drives via lsblk — listed whether or not they're mounted
+// (most setups don't auto-mount). One "label|mountpoint|device" per line;
+// mountpoint is empty for unmounted drives (click mounts them via udisksctl).
 func buildDevices() {
-    emit chomp(exec("for d in /run/media/$USER/* /media/$USER/* /media/* /mnt/*; do [ -d \"$d\" ] && grep -q \" $d \" /proc/self/mounts && printf '%s|%s\\n' \"$(basename \"$d\")\" \"$d\"; done 2>/dev/null | sort -u"))
+    emit chomp(exec("lsblk -Pno NAME,LABEL,MOUNTPOINT,RM,TYPE,FSTYPE 2>/dev/null | while read l; do eval \"$l\"; if [ \"$TYPE\" = part ] && [ \"$RM\" = 1 ] && [ -n \"$FSTYPE\" ]; then printf '%s|%s|%s\\n' \"${LABEL:-$NAME}\" \"$MOUNTPOINT\" \"/dev/$NAME\"; fi; done"))
 }
 
 // Combined sidebar model: lines "kind|label|path". kind h=header (not clickable),
@@ -617,8 +617,15 @@ just run {
                         let pr = (ey - TOP()) / ROWH()
                         if pr >= 0 && pr < countLines(places) {
                             let line = nthLine(places, pr)
-                            if fieldAt(line, 0) != "h" {
-                                cwd = fieldAt(line, 2)
+                            let kind = fieldAt(line, 0)
+                            let dest = fieldAt(line, 2)
+                            // drive with no mountpoint -> mount it via udisksctl
+                            if kind == "d" && dest == "" {
+                                let dev = fieldAt(line, 3)
+                                dest = chomp(exec("udisksctl mount -b '" + dev + "' 2>&1 | sed -n 's/.* at //p' | sed 's/[.]$//'"))
+                            }
+                            if kind != "h" && dest != "" && existsDir(dest) {
+                                cwd = dest
                                 hist = truncLines(hist, histIdx + 1) + cwd + "\n"
                                 histIdx = countLines(hist) - 1
                                 entries = buildEntries(cwd)
