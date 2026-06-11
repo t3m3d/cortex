@@ -82,6 +82,26 @@ func buildEntries(cwd) {
     }
     emit "d ..\n" + dirs + files
 }
+// quick-access places: "label<TAB>path" lines, standard dirs that exist.
+func _place(label, path) {
+    if chomp(exec("test -d '" + path + "' && echo 1")) == "1" { emit label + fromCharCode(9) + path + "\n" }
+    emit ""
+}
+func buildPlaces() {
+    let home = homeDir()
+    let out = "Home" + fromCharCode(9) + home + "\n"
+    out = out + _place("Desktop", home + "/Desktop")
+    out = out + _place("Documents", home + "/Documents")
+    out = out + _place("Downloads", home + "/Downloads")
+    out = out + _place("Pictures", home + "/Pictures")
+    out = out + _place("Music", home + "/Music")
+    out = out + _place("Videos", home + "/Videos")
+    out = out + "Filesystem" + fromCharCode(9) + "/\n"
+    emit out
+}
+func plLabel(s) { let t = indexOf(s, fromCharCode(9))  emit substring(s, 0, t) }
+func plPath(s)  { let t = indexOf(s, fromCharCode(9))  emit substring(s, t + 1, len(s)) }
+func PLY()      { emit HDRH() + 36 }   // first place row y
 func entIsDir(e, r) { emit nthLine(e, r)[0] == "d" }
 func entName(e, r)  { let l = nthLine(e, r)  emit substring(l, 2, len(l)) }
 func parentDir(cwd) {
@@ -240,10 +260,20 @@ func fileIconFor(name, fb, img, arc, med) {
 func IBIG() { emit 64 }
 
 // ── render ──────────────────────────────────────────────────────────────────
-func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig) {
+func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml) {
     fbClear(px, W, H, cBg())
     fbFillRect(px, W, 0, HDRH(), SIDEW(), H - HDRH(), cSide())
-    fbDrawText(px, W, H, font, 14, HDRH() + 14, "Quick access", cMuted())
+    fbDrawText(px, W, H, font, 16, HDRH() + 16, "Quick access", cMuted())
+    let np = countLines(places)
+    let p = 0
+    while p < np {
+        let line = nthLine(places, p)
+        let py = PLY() + p * 30
+        if plPath(line) == cwd { fbRoundRect(px, W, H, 6, py - 4, SIDEW() - 12, 28, 8, cSel()) }
+        fbBlitAlpha(px, W, H, 14, py - 4, folderSml, 24, 24)
+        fbDrawText(px, W, H, font, 44, py + 8, plLabel(line), cText())
+        p += 1
+    }
     fbFillRect(px, W, 0, 0, W, HDRH(), cHdr())
     fbFillCircle(px, W, H, 24, 24, 15, cSide())
     fbFillCircle(px, W, H, 60, 24, 15, cSide())
@@ -318,6 +348,8 @@ just run {
     let imageBig   = loadIcon("img", imageSvg(), big)
     let archiveBig = loadIcon("arc", archiveSvg(), big)
     let mediaBig   = loadIcon("med", mediaSvg(), big)
+    let folderSml  = loadIcon("foldersml", folderSvg(), 24)
+    let places     = buildPlaces()
     let nextId = 12
     let prevBuf = 0  let prevPool = 0  let prevMfd = 0
     let mouseX = 0  let mouseY = 0
@@ -371,6 +403,14 @@ just run {
                 if obj == PTR && op == 2 { mouseX = wlFixed(eb, off + 12)  mouseY = wlFixed(eb, off + 16) }
                 if obj == PTR && op == 3 {
                     if wlU32(eb, off + 16) == 272 && wlU32(eb, off + 20) == 1 {
+                        if mouseX < SIDEW() && mouseY >= PLY() - 4 {
+                            let prow = (mouseY - PLY() + 4) / 30
+                            if prow >= 0 && prow < countLines(places) {
+                                let tgt = plPath(nthLine(places, prow))
+                                if tgt != cwd { cwd = tgt  ent = buildEntries(cwd)  sel = 0  scroll = 0  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }
+                            }
+                            dirty = 1
+                        }
                         if mouseX >= SIDEW() && mouseY >= HDRH() {
                             let cols = gridCols(W)
                             let ccol = (mouseX - SIDEW() - PAD()) / CELLW()
@@ -409,7 +449,7 @@ just run {
             let sz = stride * H
             let m = memfdCreate(sz)
             let px = mmapShared(m, sz)
-            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig)
+            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml)
             wlCreatePool(fd, SHM, pool, m, sz)
             wlPoolCreateBuffer(fd, pool, buf, 0, W, H, stride, 1)
             wlSurfaceAttach(fd, SURF, buf, 0, 0)
