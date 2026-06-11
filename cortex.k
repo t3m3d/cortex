@@ -71,6 +71,13 @@ func fileSvg() {
          "<rect x='17' y='30' width='10' height='2.6' rx='1.3' fill='#AEB4C0'/></svg>"
 }
 
+func driveSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>" +
+         "<rect x='3' y='7' width='18' height='10' rx='2.5' fill='#1E9E5E'/>" +
+         "<rect x='3' y='7' width='18' height='5' rx='2.5' fill='#34C77E'/>" +
+         "<circle cx='17.5' cy='14' r='1.3' fill='#EAF7F0'/></svg>"
+}
+
 // toolbar symbols (green), rasterized like the file icons
 func backSvg() {
     emit "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>" +
@@ -278,11 +285,59 @@ func buildPlaces() {
     if line != "" && existsDir(line) { out = addPlace(out, basename(line), line) }
     emit out
 }
-func placeLabel(places, row) { emit beforeBar(nthLine(places, row)) }
-func placePath(places, row)  { emit afterBar(nthLine(places, row)) }
 func addBookmark(cwd) {
     exec("mkdir -p \"$(dirname '" + bookmarksPath() + "')\"")
     exec("echo '" + cwd + "' >> '" + bookmarksPath() + "'")
+}
+
+// the n-th '|'-separated field of s
+func fieldAt(s, n) {
+    let start = 0
+    let f = 0
+    let i = 0
+    while i <= len(s) {
+        if i == len(s) || s[i] == "|" {
+            if f == n { emit substring(s, start, i) }
+            f += 1
+            start = i + 1
+        }
+        i += 1
+    }
+    emit ""
+}
+
+// Mounted external/removable drives: dirs under the usual auto-mount roots
+// that are actually mountpoints (checked against /proc/self/mounts). One
+// "label|mountpoint" per line. Re-scanned so hot-plugged drives appear.
+func buildDevices() {
+    emit chomp(exec("for d in /run/media/$USER/* /media/$USER/* /media/* /mnt/*; do [ -d \"$d\" ] && grep -q \" $d \" /proc/self/mounts && printf '%s|%s\\n' \"$(basename \"$d\")\" \"$d\"; done 2>/dev/null | sort -u"))
+}
+
+// Combined sidebar model: lines "kind|label|path". kind h=header (not clickable),
+// p=place (folder icon), d=device (drive icon).
+func sbItem(out, kind, label, path) { emit out + kind + "|" + label + "|" + path + "\n" }
+func buildSidebar() {
+    let out = sbItem("", "h", "Quick access", "")
+    let pl = buildPlaces()
+    let n = countLines(pl)
+    let i = 0
+    while i < n {
+        let ln = nthLine(pl, i)
+        out = sbItem(out, "p", beforeBar(ln), afterBar(ln))
+        i += 1
+    }
+    let dv = buildDevices()
+    let m = countLines(dv)
+    if m > 0 {
+        out = sbItem(out, "h", "Drives", "")
+        let j = 0
+        while j < m {
+            let ln = nthLine(dv, j)
+            out = sbItem(out, "d", beforeBar(ln), afterBar(ln))
+            j += 1
+        }
+    }
+    emit out
 }
 
 // ── directory model ────────────────────────────────────────────────────
@@ -340,7 +395,7 @@ func addrShow(text, fieldW, focused) {
     emit "." + substring(t, len(t) - max + 1, len(t))
 }
 
-func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) {
+func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) {
     let win = x11GenId(info, 1)
     let gcClear = x11GenId(info, 3)
     let gcBar = x11GenId(info, 4)
@@ -383,14 +438,22 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
     if addrFocused == 1 { shown = addr }
     x11ImageText8(fd, win, gcAddrTx, addrX() + 8, btnY() + BTNW() / 2 + 4, addrShow(shown, afW - 12, addrFocused))
 
-    // sidebar list (small icons)
-    x11ImageText8(fd, win, gcSideTx, 12, TOP() + 17, "Quick access")
+    // sidebar — combined model: headers + places (folder icon) + devices (drive)
     let np = countLines(places)
     let p = 0
     while p < np {
-        let y = TOP() + (p + 1) * ROWH()
-        if haveIcons == 1 { blitIcon(fd, win, gcRow, 10, y + 2, folderSml, scratch, cSide(dark), ICONSML()) }
-        x11ImageText8(fd, win, gcSideTx, 36, y + 17, placeLabel(places, p))
+        let y = TOP() + p * ROWH()
+        let line = nthLine(places, p)
+        let kind = fieldAt(line, 0)
+        if kind == "h" {
+            x11ImageText8(fd, win, gcSideTx, 12, y + 17, fieldAt(line, 1))
+        } else {
+            if haveIcons == 1 {
+                if kind == "d" { blitIcon(fd, win, gcRow, 10, y + 2, driveSml, scratch, cSide(dark), ICONSML()) }
+                else { blitIcon(fd, win, gcRow, 10, y + 2, folderSml, scratch, cSide(dark), ICONSML()) }
+            }
+            x11ImageText8(fd, win, gcSideTx, 36, y + 17, fieldAt(line, 1))
+        }
         p += 1
     }
 
@@ -474,14 +537,17 @@ just run {
     let folderBigHex = rasterHex("folder", folderSvg(), big)
     let fileBigHex   = rasterHex("file", fileSvg(), big)
     let haveIcons = 0
+    let driveSmlHex  = rasterHex("drive", driveSvg(), sml)
     let folderSml = bufNew(iconBytes(sml))
     let folderBig = bufNew(iconBytes(big))
     let fileBig   = bufNew(iconBytes(big))
+    let driveSml  = bufNew(iconBytes(sml))
     if len(folderSmlHex) >= iconBytes(sml) * 2 && len(folderBigHex) >= iconBytes(big) * 2 && len(fileBigHex) >= iconBytes(big) * 2 {
         haveIcons = 1
         folderSml = hexToBuf(folderSmlHex, iconBytes(sml))
         folderBig = hexToBuf(folderBigHex, iconBytes(big))
         fileBig   = hexToBuf(fileBigHex, iconBytes(big))
+        if len(driveSmlHex) >= iconBytes(sml) * 2 { driveSml = hexToBuf(driveSmlHex, iconBytes(sml)) }
     }
     // toolbar glyphs (green)
     let backRaw = bufNew(iconBytes(tbz))
@@ -500,7 +566,7 @@ just run {
 
     let cwd = chomp(exec("pwd"))
     let entries = buildEntries(cwd)
-    let places = buildPlaces()
+    let places = buildSidebar()
     let sel = 0
     let lastRow = 0 - 1
     let lastTime = 0
@@ -519,11 +585,13 @@ just run {
         else {
             let t = x11EventType(ev)
             if t == 12 {
-                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
+                // re-scan devices on (re)expose so hot-plugged drives show up
+                places = buildSidebar()
+                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml)
             } else if t == 22 {
                 curW = x11EventWidth(ev)
                 curH = x11EventHeight(ev)
-                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
+                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml)
             } else if t == 4 {
                 let ex = x11EventX(ev)
                 let ey = x11EventY(ev)
@@ -537,22 +605,27 @@ just run {
                         if histIdx < countLines(hist) - 1 { histIdx = histIdx + 1  cwd = nthLine(hist, histIdx)  entries = buildEntries(cwd)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }
                     } else if ex >= refX() && ex < refX() + BTNW() {
                         entries = buildEntries(cwd)
+                        places = buildSidebar()
                     } else if ex >= addrX() {
                         addrFocused = 1
                         addr = cwd
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml)
                 } else if ey >= TOP() {
                     addrFocused = 0
                     if ex < SIDEBAR() {
-                        let pr = (ey - TOP()) / ROWH() - 1
+                        let pr = (ey - TOP()) / ROWH()
                         if pr >= 0 && pr < countLines(places) {
-                            cwd = placePath(places, pr)
-                            hist = truncLines(hist, histIdx + 1) + cwd + "\n"
-                            histIdx = countLines(hist) - 1
-                            entries = buildEntries(cwd)
-                            sel = 0
-                            x11SetTitle(fd, win, "cortex - " + basename(cwd))
+                            let line = nthLine(places, pr)
+                            if fieldAt(line, 0) != "h" {
+                                cwd = fieldAt(line, 2)
+                                hist = truncLines(hist, histIdx + 1) + cwd + "\n"
+                                histIdx = countLines(hist) - 1
+                                entries = buildEntries(cwd)
+                                sel = 0
+                                places = buildSidebar()
+                                x11SetTitle(fd, win, "cortex - " + basename(cwd))
+                            }
                         }
                     } else {
                         let cols = gridCols(curW)
@@ -577,7 +650,7 @@ just run {
                             lastTime = time
                         }
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml)
                 }
             } else if t == 2 {
                 let kc = x11KeyDetail(ev)
@@ -602,7 +675,7 @@ just run {
                         let ch = keyChar(kmap, kc, shift)
                         if ch != "" { addr = addr + ch }
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml)
                 } else {
                     if kc == 9 { running = 0 }                                  // Esc
                     else if kc == 36 {                                          // Enter -> open sel
@@ -615,14 +688,14 @@ just run {
                             sel = 0
                             x11SetTitle(fd, win, "cortex - " + basename(cwd))
                         }
-                        repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark)
+                        repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml)
                     }
-                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  entries = buildEntries(cwd)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
-                    else if kc == 56 { addBookmark(cwd)  places = buildPlaces()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
-                    else if kc == 116 { let c = gridCols(curW)  if sel + c < countLines(entries) { sel = sel + c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
-                    else if kc == 111 { let c = gridCols(curW)  if sel - c >= 0 { sel = sel - c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
-                    else if kc == 114 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
-                    else if kc == 113 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark) }
+                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  entries = buildEntries(cwd)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
+                    else if kc == 56 { addBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
+                    else if kc == 116 { let c = gridCols(curW)  if sel + c < countLines(entries) { sel = sel + c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
+                    else if kc == 111 { let c = gridCols(curW)  if sel - c >= 0 { sel = sel - c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
+                    else if kc == 114 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
+                    else if kc == 113 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
                 }
             } else if t == 33 {
                 // ClientMessage — WM close request (WM_DELETE_WINDOW @ data[12])
