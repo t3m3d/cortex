@@ -13,10 +13,15 @@ cortex itself.
 ## Build & run
 
 ```sh
+./build.sh --run            # builds ./cortex and launches it
+# or, manually:
 KRYPTON_ROOT=~/path/to/krypton \
   ~/path/to/krypton/bootstrap/kcc_driver_linux_x86_64 cortex.k -o /tmp/cortex
 /tmp/cortex
 ```
+
+`build.sh` defaults `KRYPTON_ROOT` to `../krypton`; override it if your
+checkout is elsewhere.
 
 Requires (runtime, optional but recommended): `ImageMagick` (`magick`/`convert`)
 + `xxd` for crisp raster icons, `gio`/`udisksctl` for trash & drive mounting,
