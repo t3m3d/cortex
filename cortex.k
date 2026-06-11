@@ -56,9 +56,12 @@ func addrX()  { emit 142 }
 func folderSvg() {
     emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
          "<defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'>" +
-         "<stop offset='0' stop-color='#34C77E'/><stop offset='1' stop-color='#1E9E5E'/></linearGradient></defs>" +
-         "<path d='M7 14 a3 3 0 0 1 3-3 h8.3 a2.5 2.5 0 0 1 1.8 0.75 l2.6 2.6 a2.5 2.5 0 0 0 1.8 0.75 H38 a3 3 0 0 1 3 3 v14 a3 3 0 0 1 -3 3 H10 a3 3 0 0 1 -3-3 z' fill='#15814E'/>" +
-         "<path d='M6 23 a3 3 0 0 1 3-3 h30 a3 3 0 0 1 3 3 v11 a3 3 0 0 1 -3 3 H9 a3 3 0 0 1 -3-3 z' fill='url(#g)'/></svg>"
+         "<stop offset='0' stop-color='#38CE84'/><stop offset='1' stop-color='#1E9E5E'/></linearGradient></defs>" +
+         "<path d='M7 14 a3 3 0 0 1 3-3 h8.3 a2.5 2.5 0 0 1 1.8 .75 l2.6 2.6 a2.5 2.5 0 0 0 1.8 .75 H38 a3 3 0 0 1 3 3 v14 a3 3 0 0 1 -3 3 H10 a3 3 0 0 1 -3-3 z' fill='#13794A'/>" +
+         "<rect x='13.5' y='16' width='21' height='15' rx='2.2' fill='#E7EFEA' transform='rotate(-5 24 23)'/>" +
+         "<rect x='14.5' y='17' width='20' height='15' rx='2.2' fill='#FFFFFF'/>" +
+         "<path d='M6 23.5 a3 3 0 0 1 3-3 h30 a3 3 0 0 1 3 3 v10.5 a3 3 0 0 1 -3 3 H9 a3 3 0 0 1 -3-3 z' fill='url(#g)'/>" +
+         "<path d='M7.5 24 a2 2 0 0 1 2-2 h29 a2 2 0 0 1 2 2' fill='none' stroke='#6FE3A8' stroke-width='1.3' stroke-linecap='round' opacity='0.8'/></svg>"
 }
 func fileSvg() {
     emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
