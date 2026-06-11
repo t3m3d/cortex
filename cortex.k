@@ -414,6 +414,15 @@ func buildEntries(cwd, showHidden, sortMode) {
 }
 func entryIsDir(entries, row) { emit nthLine(entries, row)[0] == "d" }
 func entryName(entries, row)  { let l = nthLine(entries, row)  emit substring(l, 2, len(l)) }
+func rowOfName(entries, name) {
+    let n = countLines(entries)
+    let i = 0
+    while i < n {
+        if entryName(entries, i) == name { emit i }
+        i += 1
+    }
+    emit -1
+}
 
 func lc1(c) { if c >= "A" && c <= "Z" { emit fromCharCode(charCode(c) + 32) }  emit c }
 func hasPrefixCI(s, p) {
@@ -811,7 +820,7 @@ just run {
                         else if mi == 3 { if clipboard != "" { if clipOp == "cut" { exec("mv '" + clipboard + "' '" + cwd + "/' 2>/dev/null")  clipboard = ""  clipOp = "" } else { exec("cp -r '" + clipboard + "' '" + cwd + "/' 2>/dev/null") }  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries } }
                         else if mi == 4 { if tgt >= 0 && entryName(entries, tgt) != ".." { sel = tgt  renaming = 1  renameText = entryName(entries, tgt) } }
                         else if mi == 5 { if tgt >= 0 && entryName(entries, tgt) != ".." { trashItem(joinDir(cwd, entryName(entries, tgt)))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } }
-                        else if mi == 6 { newFolder(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }
+                        else if mi == 6 { newFolder(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  let nf = rowOfName(entries, "New Folder")  if nf >= 0 { sel = nf  renaming = 1  renameText = "" } }
                         else if mi == 7 { openTerminal(cwd) }
                         else if mi == 8 { if tgt >= 0 && entryName(entries, tgt) != ".." { duplicateEntry(cwd, entryName(entries, tgt))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries } }
                         else if mi == 9 { if tgt >= 0 && entryName(entries, tgt) != ".." { compressEntry(cwd, entryName(entries, tgt))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries } }
@@ -1002,9 +1011,9 @@ just run {
                     else if kc == 43 && ctrl == 1 { if showHidden == 1 { showHidden = 0 } else { showHidden = 1 }  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  sel = 0  scroll = 0  searchMode = 0  searchText = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+H hidden
                     else if kc == 39 && ctrl == 1 { sortMode = sortMode + 1  if sortMode > 2 { sortMode = 0 }  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  sel = 0  scroll = 0  searchMode = 0  searchText = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd) + " [" + sortName(sortMode) + "]")  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+S cycle sort
                     else if kc == 31 && ctrl == 1 { if sel >= 0 && sel < countLines(entries) { showProps(joinDir(cwd, entryName(entries, sel)), entryName(entries, sel)) } }  // Ctrl+I properties
-                    else if kc == 57 && ctrl == 1 && shift == 0 { newFile(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+N new file
+                    else if kc == 57 && ctrl == 1 && shift == 0 { newFile(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  let nf = rowOfName(entries, "New File")  if nf >= 0 { sel = nf  renaming = 1  renameText = "" }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Ctrl+N new file
                     else if kc == 54 && ctrl == 1 && shift == 1 { if sel >= 0 && sel < countLines(entries) { copyPath(joinDir(cwd, entryName(entries, sel))) } }  // Ctrl+Shift+C copy path
-                    else if kc == 57 && ctrl == 1 && shift == 1 { newFolder(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // n new folder
+                    else if kc == 57 && ctrl == 1 && shift == 1 { newFolder(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  let nf = rowOfName(entries, "New Folder")  if nf >= 0 { sel = nf  renaming = 1  renameText = "" }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // n new folder
                     else if kc == 70 { openTerminal(cwd) }                       // F4 terminal here
                     else if kc == 68 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { renaming = 1  renameText = entryName(entries, sel) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // F2 rename
                     else if kc == 119 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText) }  // Delete -> trash
