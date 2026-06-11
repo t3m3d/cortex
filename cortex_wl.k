@@ -115,6 +115,12 @@ func parentDir(cwd) {
     emit substring(cwd, 0, i)
 }
 func joinDir(cwd, name) { if cwd == "/" { emit "/" + name }  emit cwd + "/" + name }
+func truncLines(s, n) {
+    let out = ""
+    let i = 0
+    while i < n { out = out + nthLine(s, i) + "\n"  i += 1 }
+    emit out
+}
 func basename(p) {
     let i = len(p) - 1
     while i >= 0 && p[i] != "/" { i = i - 1 }
@@ -360,6 +366,7 @@ just run {
     let nextId = 12
     let prevBuf = 0  let prevPool = 0  let prevMfd = 0
     let mouseX = 0  let mouseY = 0  let ctrlDown = 0  let altDown = 0
+    let hist = cwd + "\n"  let histIdx = 0  let lastCwd = cwd  let fromHist = 0
 
     let running = 1
     while running == 1 {
@@ -419,6 +426,12 @@ just run {
                 if obj == PTR && op == 2 { mouseX = wlFixed(eb, off + 12)  mouseY = wlFixed(eb, off + 16) }
                 if obj == PTR && op == 3 {
                     if wlU32(eb, off + 16) == 272 && wlU32(eb, off + 20) == 1 {
+                        if mouseY < HDRH() && mouseX < 120 {
+                            if mouseX >= 9 && mouseX < 39 { if histIdx > 0 { histIdx -= 1  cwd = nthLine(hist, histIdx)  ent = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  fromHist = 1  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } }
+                            if mouseX >= 45 && mouseX < 75 { if histIdx < countLines(hist) - 1 { histIdx += 1  cwd = nthLine(hist, histIdx)  ent = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  fromHist = 1  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } }
+                            if mouseX >= 81 && mouseX < 111 { ent = buildEntries(cwd, showHidden)  places = buildPlaces() }
+                            dirty = 1
+                        }
                         if mouseX < SIDEW() && mouseY >= PLY() - 4 {
                             let prow = (mouseY - PLY() + 4) / 30
                             if prow >= 0 && prow < countLines(places) {
@@ -456,6 +469,10 @@ just run {
                 }
                 off = off + s
             }
+        }
+        if cwd != lastCwd {
+            if fromHist == 0 { hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1 }
+            lastCwd = cwd  fromHist = 0
         }
         if dirty == 1 && running == 1 {
             // free previous frame (ids never reused — keep allocating fresh)
