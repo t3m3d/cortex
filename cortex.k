@@ -513,6 +513,16 @@ func buildEntries(cwd, showHidden, sortMode) {
 func entryIsDir(entries, row) { emit nthLine(entries, row)[0] == "d" }
 func entryName(entries, row)  { let l = nthLine(entries, row)  emit substring(l, 2, len(l)) }
 // pick a folder icon by well-known name (Files-style glyph folders), else generic
+// filled rounded rectangle (rect + 4 corner circles) — GNOME-style pills/selection
+func roundRect(fd, win, gc, x, y, w, h, r) {
+    let d = r + r
+    x11FillRect(fd, win, gc, x + r, y, w - d, h)
+    x11FillRect(fd, win, gc, x, y + r, w, h - d)
+    x11FillArc(fd, win, gc, x, y, d, d, 0, 23040)
+    x11FillArc(fd, win, gc, x + w - d, y, d, d, 0, 23040)
+    x11FillArc(fd, win, gc, x, y + h - d, d, d, 0, 23040)
+    x11FillArc(fd, win, gc, x + w - d, y + h - d, d, d, 0, 23040)
+}
 func folderIconFor(name, fb, doc, dl, mus, pic, vid, desk) {
     if name == "Documents" { emit doc }
     if name == "Downloads" { emit dl }
@@ -722,13 +732,7 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
         } else {
             let rowBg = cSide(dark)
             if fieldAt(line, 2) == cwd {
-                let px0 = 6  let py0 = y + 2  let pw = SIDEBAR() - 12  let ph = ROWH() - 4
-                x11FillRect(fd, win, gcSelBox, px0 + 8, py0, pw - 16, ph)
-                x11FillRect(fd, win, gcSelBox, px0, py0 + 8, pw, ph - 16)
-                x11FillArc(fd, win, gcSelBox, px0, py0, 16, 16, 0, 23040)
-                x11FillArc(fd, win, gcSelBox, px0 + pw - 16, py0, 16, 16, 0, 23040)
-                x11FillArc(fd, win, gcSelBox, px0, py0 + ph - 16, 16, 16, 0, 23040)
-                x11FillArc(fd, win, gcSelBox, px0 + pw - 16, py0 + ph - 16, 16, 16, 0, 23040)
+                roundRect(fd, win, gcSelBox, 6, y + 2, SIDEBAR() - 12, ROWH() - 4, 8)
                 rowBg = cSelLite(dark)
             }
             if haveIcons == 1 {
@@ -757,12 +761,12 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
                 let bg = cBg(dark)
                 let lblGc = gcRow
                 if markHas(marked, entryName(entries, i)) == 1 {
-                    x11FillRect(fd, win, gcSelBox, cx, cy, cellW - 8, rowH - 8)
+                    roundRect(fd, win, gcSelBox, cx, cy, cellW - 8, rowH - 8, 12)
                     bg = cSelLite(dark)
                     lblGc = gcLblSel
                 }
                 if i == sel {
-                    x11FillRect(fd, win, gcSelBox, cx, cy, cellW - 8, rowH - 8)
+                    roundRect(fd, win, gcSelBox, cx, cy, cellW - 8, rowH - 8, 12)
                     bg = cSelLite(dark)
                     lblGc = gcLblSel
                 }
