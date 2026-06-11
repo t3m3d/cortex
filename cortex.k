@@ -161,7 +161,7 @@ func drawFile(fd, win, gc, x, y) {
     x11FillRect(fd, win, gc, x + 3, y + 3, 14, 15)
 }
 
-func repaint(fd, info, cwd, entries, sel, places) {
+func repaint(fd, info, cwd, entries, sel, places, w, h) {
     let win = x11GenId(info, 1)
     let gcClear = x11GenId(info, 3)
     let gcBar = x11GenId(info, 4)
@@ -175,11 +175,13 @@ func repaint(fd, info, cwd, entries, sel, places) {
     let gcSideTx = x11GenId(info, 12)
     let gcDiv = x11GenId(info, 13)
 
-    // background, toolbar, sidebar, divider
-    x11FillRect(fd, win, gcClear, 0, 0, W(), H())
-    x11FillRect(fd, win, gcSide, 0, TOOLBAR(), SIDEBAR(), H() - TOOLBAR())
-    x11FillRect(fd, win, gcBar, 0, 0, W(), TOOLBAR())
-    x11FillRect(fd, win, gcDiv, SIDEBAR(), TOOLBAR(), 1, H() - TOOLBAR())
+    // background, toolbar, sidebar, divider — sized to the live window (h/w
+    // come from the last ConfigureNotify), so the sidebar reaches the bottom
+    // at any window size.
+    x11FillRect(fd, win, gcClear, 0, 0, w, h)
+    x11FillRect(fd, win, gcSide, 0, TOOLBAR(), SIDEBAR(), h - TOOLBAR())
+    x11FillRect(fd, win, gcBar, 0, 0, w, TOOLBAR())
+    x11FillRect(fd, win, gcDiv, SIDEBAR(), TOOLBAR(), 1, h - TOOLBAR())
     x11ImageText8(fd, win, gcPath, 10, 24, cwd + "      [b]ookmark  [bksp]up  [esc]quit")
 
     // sidebar: header + places
@@ -201,7 +203,7 @@ func repaint(fd, info, cwd, entries, sel, places) {
         let y = TOOLBAR() + i * ROWH()
         let textGc = gcRow
         if i == sel {
-            x11FillRect(fd, win, gcSelFill, bx, y, W() - bx, ROWH())
+            x11FillRect(fd, win, gcSelFill, bx, y, w - bx, ROWH())
             textGc = gcSel
         }
         if entryIsDir(entries, i) { drawFolder(fd, win, gcFolder, bx + ICONX(), y) }
@@ -219,7 +221,9 @@ just run {
 
     let root = x11Root(info)
     let win = x11GenId(info, 1)
-    x11CreateWindow(fd, win, root, 80, 60, W(), H(), cWhite(), 32773)
+    // event-mask: Expose(0x8000)|KeyPress(0x1)|ButtonPress(0x4)|
+    // StructureNotify(0x20000) = 0x28005 = 163845 (StructureNotify -> resize).
+    x11CreateWindow(fd, win, root, 80, 60, W(), H(), cWhite(), 163845)
 
     let font = x11GenId(info, 2)
     x11OpenFont(fd, font, "fixed")
@@ -244,6 +248,8 @@ just run {
     let sel = 0
     let lastRow = 0 - 1
     let lastTime = 0
+    let curW = W()
+    let curH = H()
 
     let ev = bufNew(32)
     let running = 1
@@ -253,7 +259,12 @@ just run {
         else {
             let t = x11EventType(ev)
             if t == 12 {
-                repaint(fd, info, cwd, entries, sel, places)
+                repaint(fd, info, cwd, entries, sel, places, curW, curH)
+            } else if t == 22 {
+                // ConfigureNotify: window resized — width@20, height@22.
+                curW = x11EventWidth(ev)
+                curH = x11EventHeight(ev)
+                repaint(fd, info, cwd, entries, sel, places, curW, curH)
             } else if t == 4 {
                 let ex = x11EventX(ev)
                 let ey = x11EventY(ev)
@@ -266,7 +277,7 @@ just run {
                             cwd = placePath(places, pr)
                             entries = buildEntries(cwd)
                             sel = 0
-                            repaint(fd, info, cwd, entries, sel, places)
+                            repaint(fd, info, cwd, entries, sel, places, curW, curH)
                         }
                     } else {
                         let row = (ey - TOOLBAR()) / ROWH()
@@ -281,7 +292,7 @@ just run {
                             }
                             lastRow = row
                             lastTime = time
-                            repaint(fd, info, cwd, entries, sel, places)
+                            repaint(fd, info, cwd, entries, sel, places, curW, curH)
                         }
                     }
                 }
@@ -295,12 +306,12 @@ just run {
                         entries = buildEntries(cwd)
                         sel = 0
                     }
-                    repaint(fd, info, cwd, entries, sel, places)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH)
                 }
-                else if kc == 22 { cwd = parentDir(cwd)  entries = buildEntries(cwd)  sel = 0  repaint(fd, info, cwd, entries, sel, places) }   // Backspace
-                else if kc == 56 { addBookmark(cwd)  places = buildPlaces()  repaint(fd, info, cwd, entries, sel, places) }                     // 'b'
-                else if kc == 116 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places) }               // Down
-                else if kc == 111 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places) }                               // Up
+                else if kc == 22 { cwd = parentDir(cwd)  entries = buildEntries(cwd)  sel = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH) }   // Backspace
+                else if kc == 56 { addBookmark(cwd)  places = buildPlaces()  repaint(fd, info, cwd, entries, sel, places, curW, curH) }                     // 'b'
+                else if kc == 116 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH) }               // Down
+                else if kc == 111 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH) }                               // Up
             } else if t == 0 {
                 print("cortex: X error code=" + bufGetByte(ev, 1) + " major=" + bufGetByte(ev, 10))
                 running = 0
