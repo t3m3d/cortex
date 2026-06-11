@@ -743,7 +743,9 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
     } else { if searchMode == 1 {
         x11ImageText8(fd, win, gcStat, 10, sy + 16, "search:  " + searchText + "_")
     } else {
-        x11ImageText8(fd, win, gcStat, 10, sy + 16, buildStatus(cwd, entries))
+        let statTxt = buildStatus(cwd, entries)
+        if marked != "" { statTxt = countLines(marked) + " selected     " + statTxt }
+        x11ImageText8(fd, win, gcStat, 10, sy + 16, statTxt)
         if sel >= 0 && sel < nrows {
             let snm = entryName(entries, sel)
             x11ImageText8(fd, win, gcStat, w - len(snm) * charW() - 12, sy + 16, snm)
