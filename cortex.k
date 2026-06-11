@@ -80,6 +80,26 @@ func fileSvg() {
          "<rect x='17' y='30' width='10' height='2.6' rx='1.3' fill='#AEB4C0'/></svg>"
 }
 
+func imageSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<rect x='8' y='9' width='32' height='30' rx='3.5' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<circle cx='17' cy='18' r='3.2' fill='#34C77E'/>" +
+         "<path d='M10 38 l10-12 6 7 6-6 6 11 z' fill='#1FA463'/></svg>"
+}
+func archiveSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<path d='M11 6 a3 3 0 0 1 3-3 h16 l10 10 v26 a3 3 0 0 1 -3 3 H14 a3 3 0 0 1 -3-3 z' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<rect x='21.5' y='4' width='4' height='4' fill='#1FA463'/><rect x='21.5' y='10' width='4' height='4' fill='#34C77E'/>" +
+         "<rect x='21.5' y='16' width='4' height='4' fill='#1FA463'/><rect x='21.5' y='22' width='4' height='4' fill='#34C77E'/>" +
+         "<rect x='19.5' y='28' width='8' height='9' rx='1.5' fill='#1E9E5E'/>" +
+         "<rect x='22.5' y='31' width='2' height='3.5' rx='1' fill='#EAF7F0'/></svg>"
+}
+func mediaSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<rect x='8' y='9' width='32' height='30' rx='4' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<path d='M20 17.5 l12 6.5 -12 6.5 z' fill='#1FA463'/></svg>"
+}
+
 func driveSvg() {
     emit "<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'>" +
          "<rect x='3' y='7' width='18' height='10' rx='2.5' fill='#1E9E5E'/>" +
@@ -194,6 +214,26 @@ func chomp(s) {
     let p = s
     while len(p) > 0 && p[len(p) - 1] == fromCharCode(10) { p = substring(p, 0, len(p) - 1) }
     emit p
+}
+func lowerStr(s) {
+    let out = ""
+    let i = 0
+    while i < len(s) { out = out + lc1(s[i])  i += 1 }
+    emit out
+}
+func lastExt(name) {
+    let i = len(name) - 1
+    while i >= 0 && name[i] != "." { i = i - 1 }
+    if i < 0 { emit "" }
+    emit lowerStr(substring(name, i + 1, len(name)))
+}
+// classify a filename into an icon kind: image / archive / media / file
+func extKind(name) {
+    let e = lastExt(name)
+    if e == "png" || e == "jpg" || e == "jpeg" || e == "gif" || e == "bmp" || e == "webp" || e == "svg" || e == "ico" || e == "tiff" { emit "image" }
+    if e == "zip" || e == "tar" || e == "gz" || e == "tgz" || e == "bz2" || e == "xz" || e == "7z" || e == "rar" || e == "zst" { emit "archive" }
+    if e == "mp3" || e == "wav" || e == "flac" || e == "ogg" || e == "m4a" || e == "opus" || e == "mp4" || e == "mkv" || e == "webm" || e == "avi" || e == "mov" { emit "media" }
+    emit "file"
 }
 
 // ── icon rasterization ────────────────────────────────────────────────
@@ -367,7 +407,7 @@ func openFile(path) { exec("setsid xdg-open '" + path + "' >/dev/null 2>&1 &") }
 func newFolder(cwd) { exec("mkdir -p '" + cwd + "/New Folder'") }
 func renameTo(cwd, old, nw) { exec("mv -n '" + cwd + "/" + old + "' '" + cwd + "/" + nw + "' 2>/dev/null") }
 func trashItem(path) { exec("gio trash '" + path + "' 2>/dev/null || trash-put '" + path + "' 2>/dev/null || true") }
-func trashMarked(cwd, marked) {
+func trashMarked(cwd, marked, imageBig, archiveBig, mediaBig) {
     let n = countLines(marked)
     let i = 0
     while i < n {
@@ -377,7 +417,7 @@ func trashMarked(cwd, marked) {
     }
 }
 // newline-joined absolute paths of the marked entries (for the clipboard)
-func clipFromMarked(cwd, marked) {
+func clipFromMarked(cwd, marked, imageBig, archiveBig, mediaBig) {
     let out = ""
     let n = countLines(marked)
     let i = 0
@@ -586,7 +626,7 @@ func addrShow(text, fieldW, focused) {
     emit "." + substring(t, len(t) - max + 1, len(t))
 }
 
-func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) {
+func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) {
     let win = x11GenId(info, 1)
     let gcClear = x11GenId(info, 3)
     let gcBar = x11GenId(info, 4)
@@ -678,7 +718,14 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
                 let iy = cy + 10
                 if haveIcons == 1 {
                     if entryIsDir(entries, i) { blitIcon(fd, win, gcRow, ix, iy, folderBig, scratch, bg, ICONBIG()) }
-                    else { blitIcon(fd, win, gcRow, ix, iy, fileBig, scratch, bg, ICONBIG()) }
+                    else {
+                        let k = extKind(entryName(entries, i))
+                        let ic = fileBig
+                        if k == "image" { ic = imageBig }
+                        if k == "archive" { ic = archiveBig }
+                        if k == "media" { ic = mediaBig }
+                        blitIcon(fd, win, gcRow, ix, iy, ic, scratch, bg, ICONBIG())
+                    }
                 }
                 let disp = clipLabel(entryName(entries, i))
                 let lx = cx + (CELLW() - len(disp) * charW()) / 2
@@ -795,17 +842,29 @@ just run {
     let folderSmlHex = rasterHex("folder", folderSvg(), sml)
     let folderBigHex = rasterHex("folder", folderSvg(), big)
     let fileBigHex   = rasterHex("file", fileSvg(), big)
+    let imageBigHex  = rasterHex("image", imageSvg(), big)
+    let archiveBigHex = rasterHex("archive", archiveSvg(), big)
+    let mediaBigHex  = rasterHex("media", mediaSvg(), big)
     let haveIcons = 0
     let driveSmlHex  = rasterHex("drive", driveSvg(), sml)
     let folderSml = bufNew(iconBytes(sml))
     let folderBig = bufNew(iconBytes(big))
     let fileBig   = bufNew(iconBytes(big))
+    let imageBig   = bufNew(iconBytes(big))
+    let archiveBig = bufNew(iconBytes(big))
+    let mediaBig   = bufNew(iconBytes(big))
     let driveSml  = bufNew(iconBytes(sml))
     if len(folderSmlHex) >= iconBytes(sml) * 2 && len(folderBigHex) >= iconBytes(big) * 2 && len(fileBigHex) >= iconBytes(big) * 2 {
         haveIcons = 1
         folderSml = hexToBuf(folderSmlHex, iconBytes(sml))
         folderBig = hexToBuf(folderBigHex, iconBytes(big))
         fileBig   = hexToBuf(fileBigHex, iconBytes(big))
+        imageBig   = fileBig
+        archiveBig = fileBig
+        mediaBig   = fileBig
+        if len(imageBigHex) >= iconBytes(big) * 2 { imageBig = hexToBuf(imageBigHex, iconBytes(big)) }
+        if len(archiveBigHex) >= iconBytes(big) * 2 { archiveBig = hexToBuf(archiveBigHex, iconBytes(big)) }
+        if len(mediaBigHex) >= iconBytes(big) * 2 { mediaBig = hexToBuf(mediaBigHex, iconBytes(big)) }
         if len(driveSmlHex) >= iconBytes(sml) * 2 { driveSml = hexToBuf(driveSmlHex, iconBytes(sml)) }
         // _NET_WM_ICON: [w, h, w*h ARGB]. BGRA bytes == LE CARDINAL of 0xAARRGGBB,
         // so the folder raster doubles as the icon pixels (taskbar/alt-tab icon).
@@ -876,11 +935,11 @@ just run {
             if t == 12 {
                 // re-scan devices on (re)expose so hot-plugged drives show up
                 places = buildSidebar()
-                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
             } else if t == 22 {
                 curW = x11EventWidth(ev)
                 curH = x11EventHeight(ev)
-                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
             } else if t == 4 {
                 let ex = x11EventX(ev)
                 let ey = x11EventY(ev)
@@ -888,7 +947,7 @@ just run {
                 let btn = x11KeyDetail(ev)
                 if helpOpen == 1 {
                     helpOpen = 0
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 } else if menuOpen == 1 {
                     // click while the context menu is open: run an item or dismiss
                     menuOpen = 0
@@ -907,7 +966,7 @@ just run {
                         else if mi == 9 { if tgt >= 0 && entryName(entries, tgt) != ".." { compressEntry(cwd, entryName(entries, tgt))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries } }
                         else if mi == 10 { if tgt >= 0 && entryName(entries, tgt) != ".." { showProps(joinDir(cwd, entryName(entries, tgt)), entryName(entries, tgt)) } }
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 } else if btn == 3 && ex < SIDEBAR() && ey >= TOP() {
                     // right-click a drive in the sidebar -> unmount/eject it
                     let pr = (ey - TOP()) / ROWH()
@@ -916,7 +975,7 @@ just run {
                         if fieldAt(line, 0) == "d" && fieldAt(line, 2) != "" {
                             exec("udisksctl unmount -b '" + fieldAt(line, 3) + "' >/dev/null 2>&1")
                             places = buildSidebar()
-                            repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                            repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                         }
                     }
                 } else if btn == 3 {
@@ -935,13 +994,13 @@ just run {
                     if menuX + MENUW() > curW { menuX = curW - MENUW() - 4 }
                     let menuH = countLines(menuItems()) * MENUROW() + 8
                     if menuY + menuH > curH { menuY = curH - menuH - 4 }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 } else if btn == 4 || btn == 5 {
                     // mouse wheel -> scroll the grid
                     let ms = maxScroll(countLines(entries), gridCols(curW), curH - STATUSH() - TOP() - GRIDPAD())
                     if btn == 4 { if scroll > 0 { scroll = scroll - 1 } }
                     else { if scroll < ms { scroll = scroll + 1 } }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 } else if ey >= TITLEH() && ey < TOP() {
                     // toolbar
                     addrFocused = 0
@@ -956,7 +1015,7 @@ just run {
                         addrFocused = 1
                         addr = cwd
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 } else if ey >= TOP() {
                     addrFocused = 0
                     if ex < SIDEBAR() {
@@ -1007,7 +1066,7 @@ just run {
                             lastTime = time
                         }
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 }
             } else if t == 2 {
                 let kc = x11KeyDetail(ev)
@@ -1030,17 +1089,17 @@ just run {
                         let ch = keyChar(kmap, kc, shift)
                         if ch != "" { renameText = renameText + ch }
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 } else if searchMode == 1 {
                     // incremental filter of the current folder
                     if kc == 9 { searchMode = 0  searchText = ""  marked = ""  entries = allEntries  sel = 0 }
                     else if kc == 36 { searchMode = 0 }
-                    else if kc == 22 { if len(searchText, marked) > 0 { searchText = substring(searchText, 0, len(searchText, marked) - 1) }  entries = filterEntries(allEntries, searchText, marked)  sel = 0 }
+                    else if kc == 22 { if len(searchText, marked, imageBig, archiveBig, mediaBig) > 0 { searchText = substring(searchText, 0, len(searchText, marked, imageBig, archiveBig, mediaBig) - 1) }  entries = filterEntries(allEntries, searchText, marked, imageBig, archiveBig, mediaBig)  sel = 0 }
                     else {
                         let ch = keyChar(kmap, kc, shift)
-                        if ch != "" { searchText = searchText + ch  entries = filterEntries(allEntries, searchText, marked)  sel = 0 }
+                        if ch != "" { searchText = searchText + ch  entries = filterEntries(allEntries, searchText, marked, imageBig, archiveBig, mediaBig)  sel = 0 }
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 } else if addrFocused == 1 {
                     // editing the address bar
                     if kc == 9 { addrFocused = 0 }                              // Esc
@@ -1060,26 +1119,26 @@ just run {
                         let ch = keyChar(kmap, kc, shift)
                         if ch != "" { addr = addr + ch }
                     }
-                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                    repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 } else {
-                    if kc == 9 { if helpOpen == 1 { helpOpen = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) } else { running = 0 } }  // Esc
-                    else if kc == 67 { if helpOpen == 1 { helpOpen = 0 } else { helpOpen = 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // F1 help
+                    if kc == 9 { if helpOpen == 1 { helpOpen = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) } else { running = 0 } }  // Esc
+                    else if kc == 67 { if helpOpen == 1 { helpOpen = 0 } else { helpOpen = 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // F1 help
                     else if (kc == 25 || kc == 24) && ctrl == 1 { running = 0 }  // Ctrl+W / Ctrl+Q close
-                    else if kc == 58 && ctrl == 1 { mountAllDrives()  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+M mount all drives
-                    else if kc == 38 && ctrl == 1 && shift == 0 { marked = markAll(entries)  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+A select all
-                    else if kc == 38 && ctrl == 1 && shift == 1 { marked = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+Shift+A clear selection
-                    else if kc == 65 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { marked = markToggle(marked, entryName(entries, sel)) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Space toggle mark
-                    else if kc == 113 && alt == 1 { if histIdx > 0 { histIdx = histIdx - 1  cwd = nthLine(hist, histIdx)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  addr = cwd  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Alt+Left back
-                    else if kc == 114 && alt == 1 { if histIdx < countLines(hist) - 1 { histIdx = histIdx + 1  cwd = nthLine(hist, histIdx)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  addr = cwd  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Alt+Right forward
-                    else if kc == 110 && alt == 1 { cwd = homeDir()  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  addr = cwd  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Alt+Home home dir
-                    else if kc == 46 && ctrl == 1 { addrFocused = 1  addr = cwd  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+L address
-                    else if kc == 41 && ctrl == 1 { searchMode = 1  searchText = ""  marked = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+F search
-                    else if kc == 71 { allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  places = buildSidebar()  searchMode = 0  searchText = ""  marked = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // F5 refresh
-                    else if kc == 40 && ctrl == 1 && shift == 1 { removeBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+Shift+D unbookmark
-                    else if kc == 26 && ctrl == 1 { if sel >= 0 && sel < countLines(entries) && entryIsDir(entries, sel) == 0 { extractArchive(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+E extract
-                    else if kc == 27 && ctrl == 1 && shift == 1 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { duplicateEntry(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+D duplicate
-                    else if kc == 52 && ctrl == 1 && shift == 1 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { compressEntry(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+Shift+Z compress
-                    else if kc == 28 && ctrl == 1 && shift == 1 { exec("mkdir -p '" + homeDir() + "/.local/share/Trash/files' 2>/dev/null")  cwd = homeDir() + "/.local/share/Trash/files"  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  addr = cwd  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - Trash")  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+Shift+T trash view
+                    else if kc == 58 && ctrl == 1 { mountAllDrives()  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+M mount all drives
+                    else if kc == 38 && ctrl == 1 && shift == 0 { marked = markAll(entries)  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+A select all
+                    else if kc == 38 && ctrl == 1 && shift == 1 { marked = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+Shift+A clear selection
+                    else if kc == 65 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { marked = markToggle(marked, entryName(entries, sel)) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Space toggle mark
+                    else if kc == 113 && alt == 1 { if histIdx > 0 { histIdx = histIdx - 1  cwd = nthLine(hist, histIdx)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  addr = cwd  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Alt+Left back
+                    else if kc == 114 && alt == 1 { if histIdx < countLines(hist) - 1 { histIdx = histIdx + 1  cwd = nthLine(hist, histIdx)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  addr = cwd  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Alt+Right forward
+                    else if kc == 110 && alt == 1 { cwd = homeDir()  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  addr = cwd  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Alt+Home home dir
+                    else if kc == 46 && ctrl == 1 { addrFocused = 1  addr = cwd  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+L address
+                    else if kc == 41 && ctrl == 1 { searchMode = 1  searchText = ""  marked = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+F search
+                    else if kc == 71 { allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  places = buildSidebar()  searchMode = 0  searchText = ""  marked = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // F5 refresh
+                    else if kc == 40 && ctrl == 1 && shift == 1 { removeBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+Shift+D unbookmark
+                    else if kc == 26 && ctrl == 1 { if sel >= 0 && sel < countLines(entries) && entryIsDir(entries, sel) == 0 { extractArchive(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+E extract
+                    else if kc == 27 && ctrl == 1 && shift == 1 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { duplicateEntry(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+D duplicate
+                    else if kc == 52 && ctrl == 1 && shift == 1 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { compressEntry(cwd, entryName(entries, sel))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+Shift+Z compress
+                    else if kc == 28 && ctrl == 1 && shift == 1 { exec("mkdir -p '" + homeDir() + "/.local/share/Trash/files' 2>/dev/null")  cwd = homeDir() + "/.local/share/Trash/files"  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  addr = cwd  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - Trash")  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+Shift+T trash view
                     else if kc == 36 {                                          // Enter -> open sel (dir) / open file
                         if entryIsDir(entries, sel) {
                             let name = entryName(entries, sel)
@@ -1090,37 +1149,37 @@ just run {
                             sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""
                             x11SetTitle(fd, win, "cortex - " + basename(cwd))
                         } else { openFile(joinDir(cwd, entryName(entries, sel))) }
-                        repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                        repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                     }
-                    else if kc == 43 && ctrl == 1 { if showHidden == 1 { showHidden = 0 } else { showHidden = 1 }  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+H hidden
-                    else if kc == 39 && ctrl == 1 { sortMode = sortMode + 1  if sortMode > 2 { sortMode = 0 }  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd) + " [" + sortName(sortMode) + "]")  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+S cycle sort
+                    else if kc == 43 && ctrl == 1 { if showHidden == 1 { showHidden = 0 } else { showHidden = 1 }  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+H hidden
+                    else if kc == 39 && ctrl == 1 { sortMode = sortMode + 1  if sortMode > 2 { sortMode = 0 }  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd) + " [" + sortName(sortMode) + "]")  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+S cycle sort
                     else if kc == 31 && ctrl == 1 { if sel >= 0 && sel < countLines(entries) { showProps(joinDir(cwd, entryName(entries, sel)), entryName(entries, sel)) } }  // Ctrl+I properties
-                    else if kc == 57 && ctrl == 1 && shift == 0 { newFile(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  let nf = rowOfName(entries, "New File")  if nf >= 0 { sel = nf  renaming = 1  renameText = "" }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Ctrl+N new file
+                    else if kc == 57 && ctrl == 1 && shift == 0 { newFile(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  let nf = rowOfName(entries, "New File")  if nf >= 0 { sel = nf  renaming = 1  renameText = "" }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Ctrl+N new file
                     else if kc == 54 && ctrl == 1 && shift == 1 { if sel >= 0 && sel < countLines(entries) { copyPath(joinDir(cwd, entryName(entries, sel))) } }  // Ctrl+Shift+C copy path
-                    else if kc == 57 && ctrl == 1 && shift == 1 { newFolder(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  let nf = rowOfName(entries, "New Folder")  if nf >= 0 { sel = nf  renaming = 1  renameText = "" }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // n new folder
+                    else if kc == 57 && ctrl == 1 && shift == 1 { newFolder(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  let nf = rowOfName(entries, "New Folder")  if nf >= 0 { sel = nf  renaming = 1  renameText = "" }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // n new folder
                     else if kc == 70 { openTerminal(cwd) }                       // F4 terminal here
-                    else if kc == 68 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { renaming = 1  renameText = entryName(entries, sel) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // F2 rename
-                    else if kc == 119 { if marked != "" { trashMarked(cwd, marked)  marked = ""  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } else { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Delete -> trash
-                    else if kc == 54 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked)  clipOp = "copy" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } } }  // Ctrl+C
-                    else if kc == 53 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked)  clipOp = "cut" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "cut" } } }   // Ctrl+X
+                    else if kc == 68 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { renaming = 1  renameText = entryName(entries, sel) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // F2 rename
+                    else if kc == 119 { if marked != "" { trashMarked(cwd, marked, imageBig, archiveBig, mediaBig)  marked = ""  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } else { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Delete -> trash
+                    else if kc == 54 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked, imageBig, archiveBig, mediaBig)  clipOp = "copy" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } } }  // Ctrl+C
+                    else if kc == 53 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked, imageBig, archiveBig, mediaBig)  clipOp = "cut" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "cut" } } }   // Ctrl+X
                     else if kc == 55 && ctrl == 1 {                                                                            // Ctrl+V paste
                         if clipboard != "" {
                             pasteClip(cwd, clipboard, clipOp)
                             if clipOp == "cut" { clipboard = ""  clipOp = "" }
                             allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries
                         }
-                        repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                        repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                     }
-                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }
-                    else if kc == 40 && ctrl == 1 { addBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }
-                    else if kc == 116 { let c = gridCols(curW)  if sel + c < countLines(entries) { sel = sel + c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }
-                    else if kc == 111 { let c = gridCols(curW)  if sel - c >= 0 { sel = sel - c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }
-                    else if kc == 114 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }
-                    else if kc == 113 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }
-                    else if kc == 117 { let vh = curH - STATUSH() - TOP() - GRIDPAD()  let ms = maxScroll(countLines(entries), gridCols(curW), vh)  let pg = vh / CELLH()  if pg < 1 { pg = 1 }  scroll = scroll + pg  if scroll > ms { scroll = ms }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // PageDown
-                    else if kc == 112 { let vh = curH - STATUSH() - TOP() - GRIDPAD()  let pg = vh / CELLH()  if pg < 1 { pg = 1 }  scroll = scroll - pg  if scroll < 0 { scroll = 0 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // PageUp
-                    else if kc == 110 { scroll = 0  sel = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Home
-                    else if kc == 115 { let ms = maxScroll(countLines(entries), gridCols(curW), curH - STATUSH() - TOP() - GRIDPAD())  scroll = ms  if countLines(entries) > 0 { sel = countLines(entries) - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // End
+                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }
+                    else if kc == 40 && ctrl == 1 { addBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }
+                    else if kc == 116 { let c = gridCols(curW)  if sel + c < countLines(entries) { sel = sel + c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }
+                    else if kc == 111 { let c = gridCols(curW)  if sel - c >= 0 { sel = sel - c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }
+                    else if kc == 114 { if sel + 1 < countLines(entries) { sel += 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }
+                    else if kc == 113 { if sel > 0 { sel = sel - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }
+                    else if kc == 117 { let vh = curH - STATUSH() - TOP() - GRIDPAD()  let ms = maxScroll(countLines(entries), gridCols(curW), vh)  let pg = vh / CELLH()  if pg < 1 { pg = 1 }  scroll = scroll + pg  if scroll > ms { scroll = ms }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // PageDown
+                    else if kc == 112 { let vh = curH - STATUSH() - TOP() - GRIDPAD()  let pg = vh / CELLH()  if pg < 1 { pg = 1 }  scroll = scroll - pg  if scroll < 0 { scroll = 0 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // PageUp
+                    else if kc == 110 { scroll = 0  sel = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Home
+                    else if kc == 115 { let ms = maxScroll(countLines(entries), gridCols(curW), curH - STATUSH() - TOP() - GRIDPAD())  scroll = ms  if countLines(entries) > 0 { sel = countLines(entries) - 1 }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // End
                     else if ctrl == 0 {
                         // type-ahead: jump selection to the first matching name
                         let ch = keyChar(kmap, kc, shift)
@@ -1137,7 +1196,7 @@ just run {
                                 if rowi < scroll { scroll = rowi }
                                 if rowi >= scroll + vis { scroll = rowi - vis + 1 }
                             }
-                            repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
+                            repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                         }
                     }
                 }
