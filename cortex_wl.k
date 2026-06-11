@@ -119,8 +119,128 @@ func drawFile(px, W, H, x, y) {
     fbFillRect(px, W, x + 8, y + 22, 18, 3, cMuted())
 }
 
+
+// ── icon raster pipeline (copied from cortex.k) ────────────────────────────
+func homeDir() { emit chomp(exec("printf %s \"$HOME\"")) }
+func iconBytes(sz) { emit sz * sz * 4 }
+func hexNyb(c) {
+    if c >= "0" && c <= "9" { emit charCode(c) - 48 }
+    emit charCode(c) - 87
+}
+func hexToBuf(hex, nbytes) {
+    let b = bufNew(nbytes)
+    let i = 0
+    while i < nbytes {
+        bufSetByte(b, i, hexNyb(hex[i * 2]) * 16 + hexNyb(hex[i * 2 + 1]))
+        i += 1
+    }
+    emit b
+}
+func rasterHex(name, svg, sz) {
+    let dir = homeDir() + "/.cache/cortex"
+    exec("mkdir -p '" + dir + "'")
+    let svgf = dir + "/" + name + ".svg"
+    let hexf = dir + "/" + name + "-" + sz + ".hex"
+    writeFile(svgf, svg)
+    shellRun("convert -background none -density " + (sz * 4) + " '" + svgf + "' -resize " + sz + "x" + sz + " -depth 8 BGRA:- 2>/dev/null | xxd -p -c 0 > '" + hexf + "'")
+    emit chomp(readFile(hexf))
+}
+func lc1(c) { if c >= "A" && c <= "Z" { emit fromCharCode(charCode(c) + 32) }  emit c }
+func lowerStr(s) {
+    let out = ""
+    let i = 0
+    while i < len(s) { out = out + lc1(s[i])  i += 1 }
+    emit out
+}
+func lastExt(name) {
+    let i = len(name) - 1
+    while i >= 0 && name[i] != "." { i = i - 1 }
+    if i < 0 { emit "" }
+    emit lowerStr(substring(name, i + 1, len(name)))
+}
+func extKind(name) {
+    let e = lastExt(name)
+    if e == "png" || e == "jpg" || e == "jpeg" || e == "gif" || e == "bmp" || e == "webp" || e == "svg" || e == "ico" || e == "tiff" { emit "image" }
+    if e == "zip" || e == "tar" || e == "gz" || e == "tgz" || e == "bz2" || e == "xz" || e == "7z" || e == "rar" || e == "zst" { emit "archive" }
+    if e == "mp3" || e == "wav" || e == "flac" || e == "ogg" || e == "m4a" || e == "opus" || e == "mp4" || e == "mkv" || e == "webm" || e == "avi" || e == "mov" { emit "media" }
+    emit "file"
+}
+func folderSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'>" +
+         "<stop offset='0' stop-color='#38CE84'/><stop offset='1' stop-color='#1E9E5E'/></linearGradient></defs>" +
+         "<path d='M7 14 a3 3 0 0 1 3-3 h8.3 a2.5 2.5 0 0 1 1.8 .75 l2.6 2.6 a2.5 2.5 0 0 0 1.8 .75 H38 a3 3 0 0 1 3 3 v14 a3 3 0 0 1 -3 3 H10 a3 3 0 0 1 -3-3 z' fill='#13794A'/>" +
+         "<rect x='13.5' y='16' width='21' height='15' rx='2.2' fill='#E7EFEA' transform='rotate(-5 24 23)'/>" +
+         "<rect x='14.5' y='17' width='20' height='15' rx='2.2' fill='#FFFFFF'/>" +
+         "<path d='M6 23.5 a3 3 0 0 1 3-3 h30 a3 3 0 0 1 3 3 v10.5 a3 3 0 0 1 -3 3 H9 a3 3 0 0 1 -3-3 z' fill='url(#g)'/>" +
+         "<path d='M7.5 24 a2 2 0 0 1 2-2 h29 a2 2 0 0 1 2 2' fill='none' stroke='#6FE3A8' stroke-width='1.3' stroke-linecap='round' opacity='0.8'/></svg>"
+}
+func folderGlyph(inner) {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<defs><linearGradient id='g' x1='0' y1='0' x2='0' y2='1'>" +
+         "<stop offset='0' stop-color='#38CE84'/><stop offset='1' stop-color='#1E9E5E'/></linearGradient></defs>" +
+         "<path d='M7 14 a3 3 0 0 1 3-3 h8.3 a2.5 2.5 0 0 1 1.8 .75 l2.6 2.6 a2.5 2.5 0 0 0 1.8 .75 H38 a3 3 0 0 1 3 3 v14 a3 3 0 0 1 -3 3 H10 a3 3 0 0 1 -3-3 z' fill='#13794A'/>" +
+         "<path d='M6 23.5 a3 3 0 0 1 3-3 h30 a3 3 0 0 1 3 3 v10.5 a3 3 0 0 1 -3 3 H9 a3 3 0 0 1 -3-3 z' fill='url(#g)'/>" +
+         "<path d='M7.5 24 a2 2 0 0 1 2-2 h29 a2 2 0 0 1 2 2' fill='none' stroke='#6FE3A8' stroke-width='1.3' stroke-linecap='round' opacity='0.7'/>" +
+         inner + "</svg>"
+}
+func docFolderSvg()  { emit folderGlyph("<rect x='20' y='25.5' width='8' height='10' rx='1' fill='#FFFFFF'/><rect x='21.5' y='28' width='5' height='1' fill='#1E9E5E'/><rect x='21.5' y='30' width='5' height='1' fill='#1E9E5E'/><rect x='21.5' y='32' width='3.5' height='1' fill='#1E9E5E'/>") }
+func dlFolderSvg()   { emit folderGlyph("<path d='M24 25.5 v6.5 M20.5 29 l3.5 3.5 3.5 -3.5' fill='none' stroke='#FFFFFF' stroke-width='1.9' stroke-linecap='round' stroke-linejoin='round'/>") }
+func musicFolderSvg(){ emit folderGlyph("<path d='M28 25 v7.4 a1.9 1.9 0 1 1 -1.5 -1.85 V27.2 l-4.4 1.1 v5.6 a1.9 1.9 0 1 1 -1.5 -1.85 V27.6 z' fill='#FFFFFF'/>") }
+func picFolderSvg()  { emit folderGlyph("<rect x='18.5' y='27' width='11' height='8' rx='1.4' fill='#FFFFFF'/><rect x='22' y='25.6' width='4' height='1.8' rx='0.7' fill='#FFFFFF'/><circle cx='24' cy='31' r='2.1' fill='#1E9E5E'/>") }
+func vidFolderSvg()  { emit folderGlyph("<rect x='19' y='26.5' width='10' height='8' rx='1.4' fill='#FFFFFF'/><path d='M22.8 28.6 l3.6 2 -3.6 2 z' fill='#1E9E5E'/>") }
+func deskFolderSvg() { emit folderGlyph("<rect x='18.5' y='26' width='11' height='7' rx='1' fill='#FFFFFF'/><rect x='22.5' y='33.2' width='3' height='1.6' rx='0.4' fill='#FFFFFF'/><rect x='20' y='27.4' width='8' height='4.2' fill='#1E9E5E'/>") }
+func fileSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<path d='M11 6 a3 3 0 0 1 3-3 h16 l10 10 v26 a3 3 0 0 1 -3 3 H14 a3 3 0 0 1 -3-3 z' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<path d='M30 3 v8 a2 2 0 0 0 2 2 h8' fill='none' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<rect x='17' y='24' width='14' height='2.6' rx='1.3' fill='#1FA463'/>" +
+         "<rect x='17' y='30' width='10' height='2.6' rx='1.3' fill='#AEB4C0'/></svg>"
+}
+func imageSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<rect x='8' y='9' width='32' height='30' rx='3.5' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<circle cx='17' cy='18' r='3.2' fill='#34C77E'/>" +
+         "<path d='M10 38 l10-12 6 7 6-6 6 11 z' fill='#1FA463'/></svg>"
+}
+func archiveSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<path d='M11 6 a3 3 0 0 1 3-3 h16 l10 10 v26 a3 3 0 0 1 -3 3 H14 a3 3 0 0 1 -3-3 z' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<rect x='21.5' y='4' width='4' height='4' fill='#1FA463'/><rect x='21.5' y='10' width='4' height='4' fill='#34C77E'/>" +
+         "<rect x='21.5' y='16' width='4' height='4' fill='#1FA463'/><rect x='21.5' y='22' width='4' height='4' fill='#34C77E'/>" +
+         "<rect x='19.5' y='28' width='8' height='9' rx='1.5' fill='#1E9E5E'/>" +
+         "<rect x='22.5' y='31' width='2' height='3.5' rx='1' fill='#EAF7F0'/></svg>"
+}
+func mediaSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<rect x='8' y='9' width='32' height='30' rx='4' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
+         "<path d='M20 17.5 l12 6.5 -12 6.5 z' fill='#1FA463'/></svg>"
+}
+func folderIconFor(name, fb, doc, dl, mus, pic, vid, desk) {
+    if name == "Documents" { emit doc }
+    if name == "Downloads" { emit dl }
+    if name == "Music" { emit mus }
+    if name == "Pictures" { emit pic }
+    if name == "Videos" { emit vid }
+    if name == "Desktop" { emit desk }
+    emit fb
+}
+func loadIcon(name, svg, sz) {
+    let hex = rasterHex(name, svg, sz)
+    if len(hex) >= iconBytes(sz) * 2 { emit hexToBuf(hex, iconBytes(sz)) }
+    emit bufNew(iconBytes(sz))
+}
+func fileIconFor(name, fb, img, arc, med) {
+    let k = extKind(name)
+    if k == "image" { emit img }
+    if k == "archive" { emit arc }
+    if k == "media" { emit med }
+    emit fb
+}
+func IBIG() { emit 64 }
+
 // ── render ──────────────────────────────────────────────────────────────────
-func draw(px, W, H, font, cwd, ent, sel, scroll) {
+func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig) {
     fbClear(px, W, H, cBg())
     fbFillRect(px, W, 0, HDRH(), SIDEW(), H - HDRH(), cSide())
     fbDrawText(px, W, H, font, 14, HDRH() + 14, "Quick access", cMuted())
@@ -145,8 +265,9 @@ func draw(px, W, H, font, cwd, ent, sel, scroll) {
             if cy < H - 10 {
                 if i == sel { fbRoundRect(px, W, H, cx - 6, cy - 6, CELLW() - 16, CELLH() - 12, 10, cSel()) }
                 let nm = entName(ent, i)
-                if entIsDir(ent, i) { drawFolder(px, W, H, cx + (CELLW() - 28 - 56) / 2, cy + 6) }
-                else { drawFile(px, W, H, cx + (CELLW() - 28 - 40) / 2, cy + 4) }
+                let ic = fileIconFor(nm, fileBig, imageBig, archiveBig, mediaBig)
+                if entIsDir(ent, i) { ic = folderIconFor(nm, folderBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig) }
+                fbBlitAlpha(px, W, H, cx + (CELLW() - 28 - IBIG()) / 2, cy + 2, ic, IBIG(), IBIG())
                 let maxc = (CELLW() - 24) / 8
                 let lbl = nm
                 if len(lbl) > maxc { lbl = substring(lbl, 0, maxc) }
@@ -185,6 +306,18 @@ just run {
     let ent = buildEntries(cwd)
     let sel = 0  let scroll = 0
     let font = wlFontLoad()
+    let big = IBIG()
+    let folderBig  = loadIcon("folder", folderSvg(), big)
+    let fileBig    = loadIcon("file", fileSvg(), big)
+    let docBig     = loadIcon("docf", docFolderSvg(), big)
+    let dlBig      = loadIcon("dlf", dlFolderSvg(), big)
+    let musicBig   = loadIcon("musf", musicFolderSvg(), big)
+    let picBig     = loadIcon("picf", picFolderSvg(), big)
+    let vidBig     = loadIcon("vidf", vidFolderSvg(), big)
+    let deskBig    = loadIcon("deskf", deskFolderSvg(), big)
+    let imageBig   = loadIcon("img", imageSvg(), big)
+    let archiveBig = loadIcon("arc", archiveSvg(), big)
+    let mediaBig   = loadIcon("med", mediaSvg(), big)
     let nextId = 12
     let prevBuf = 0  let prevPool = 0  let prevMfd = 0
 
@@ -244,7 +377,7 @@ just run {
             let sz = stride * H
             let m = memfdCreate(sz)
             let px = mmapShared(m, sz)
-            draw(px, W, H, font, cwd, ent, sel, scroll)
+            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig)
             wlCreatePool(fd, SHM, pool, m, sz)
             wlPoolCreateBuffer(fd, pool, buf, 0, W, H, stride, 1)
             wlSurfaceAttach(fd, SURF, buf, 0, 0)
