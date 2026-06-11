@@ -407,7 +407,7 @@ func openFile(path) { exec("setsid xdg-open '" + path + "' >/dev/null 2>&1 &") }
 func newFolder(cwd) { exec("mkdir -p '" + cwd + "/New Folder'") }
 func renameTo(cwd, old, nw) { exec("mv -n '" + cwd + "/" + old + "' '" + cwd + "/" + nw + "' 2>/dev/null") }
 func trashItem(path) { exec("gio trash '" + path + "' 2>/dev/null || trash-put '" + path + "' 2>/dev/null || true") }
-func trashMarked(cwd, marked, imageBig, archiveBig, mediaBig) {
+func trashMarked(cwd, marked) {
     let n = countLines(marked)
     let i = 0
     while i < n {
@@ -417,7 +417,7 @@ func trashMarked(cwd, marked, imageBig, archiveBig, mediaBig) {
     }
 }
 // newline-joined absolute paths of the marked entries (for the clipboard)
-func clipFromMarked(cwd, marked, imageBig, archiveBig, mediaBig) {
+func clipFromMarked(cwd, marked) {
     let out = ""
     let n = countLines(marked)
     let i = 0
@@ -1096,10 +1096,10 @@ just run {
                     // incremental filter of the current folder
                     if kc == 9 { searchMode = 0  searchText = ""  marked = ""  entries = allEntries  sel = 0 }
                     else if kc == 36 { searchMode = 0 }
-                    else if kc == 22 { if len(searchText, marked, imageBig, archiveBig, mediaBig) > 0 { searchText = substring(searchText, 0, len(searchText, marked, imageBig, archiveBig, mediaBig) - 1) }  entries = filterEntries(allEntries, searchText, marked, imageBig, archiveBig, mediaBig)  sel = 0 }
+                    else if kc == 22 { if len(searchText) > 0 { searchText = substring(searchText, 0, len(searchText) - 1) }  entries = filterEntries(allEntries, searchText)  sel = 0 }
                     else {
                         let ch = keyChar(kmap, kc, shift)
-                        if ch != "" { searchText = searchText + ch  entries = filterEntries(allEntries, searchText, marked, imageBig, archiveBig, mediaBig)  sel = 0 }
+                        if ch != "" { searchText = searchText + ch  entries = filterEntries(allEntries, searchText)  sel = 0 }
                     }
                     repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig)
                 } else if addrFocused == 1 {
@@ -1161,9 +1161,9 @@ just run {
                     else if kc == 57 && ctrl == 1 && shift == 1 { newFolder(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  let nf = rowOfName(entries, "New Folder")  if nf >= 0 { sel = nf  renaming = 1  renameText = "" }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // n new folder
                     else if kc == 70 { openTerminal(cwd) }                       // F4 terminal here
                     else if kc == 68 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { renaming = 1  renameText = entryName(entries, sel) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // F2 rename
-                    else if kc == 119 { if marked != "" { trashMarked(cwd, marked, imageBig, archiveBig, mediaBig)  marked = ""  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } else { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Delete -> trash
-                    else if kc == 54 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked, imageBig, archiveBig, mediaBig)  clipOp = "copy" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } } }  // Ctrl+C
-                    else if kc == 53 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked, imageBig, archiveBig, mediaBig)  clipOp = "cut" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "cut" } } }   // Ctrl+X
+                    else if kc == 119 { if marked != "" { trashMarked(cwd, marked)  marked = ""  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } else { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig) }  // Delete -> trash
+                    else if kc == 54 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked)  clipOp = "copy" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } } }  // Ctrl+C
+                    else if kc == 53 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked)  clipOp = "cut" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "cut" } } }   // Ctrl+X
                     else if kc == 55 && ctrl == 1 {                                                                            // Ctrl+V paste
                         if clipboard != "" {
                             pasteClip(cwd, clipboard, clipOp)
