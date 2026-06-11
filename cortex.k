@@ -652,6 +652,74 @@ func joinDir(cwd, name) {
     if cwd == "/" { emit "/" + name }
     emit cwd + "/" + name
 }
+// breadcrumb segments for cwd: newline list of "label<TAB>abspath", root first.
+// Home collapses to a "~" chip (label for $HOME). e.g. /home/t3m3d/Documents ->
+// "/\t/" , "home\t/home" , "~\t/home/t3m3d" , "Documents\t/home/t3m3d/Documents".
+func crumbs(cwd) {
+    let tab = fromCharCode(9)
+    let home = homeDir()
+    let out = "/" + tab + "/\n"
+    let acc = ""
+    let rest = cwd
+    let underHome = cwd == home
+    if len(cwd) > len(home) && substring(cwd, 0, len(home)) == home && cwd[len(home)] == "/" { underHome = 1 }
+    if underHome == 1 {
+        out = "~" + tab + home + "\n"
+        acc = home
+        rest = substring(cwd, len(home), len(cwd))
+    }
+    let cur = ""
+    let i = 0
+    while i <= len(rest) {
+        let ch = "/"
+        if i < len(rest) { ch = rest[i] }
+        if ch == "/" {
+            if cur != "" { acc = acc + "/" + cur  out = out + cur + tab + acc + "\n"  cur = "" }
+        } else { cur = cur + ch }
+        i += 1
+    }
+    emit out
+}
+func crumbLabel(seg) { let t = indexOf(seg, fromCharCode(9))  emit substring(seg, 0, t) }
+func crumbPath(seg)  { let t = indexOf(seg, fromCharCode(9))  emit substring(seg, t + 1, len(seg)) }
+// draw the breadcrumb chips (current = bright gcTx, ancestors = muted gcMut),
+// separated by " > ", clipped to maxW.
+func drawCrumbs(fd, win, gcTx, gcMut, x0, y, maxW, cwd) {
+    let segs = crumbs(cwd)
+    let n = countLines(segs)
+    let cx = x0
+    let i = 0
+    while i < n {
+        let lbl = crumbLabel(nthLine(segs, i))
+        let wseg = len(lbl) * charW()
+        if cx + wseg > x0 + maxW { i = n }
+        else {
+            let gc = gcMut
+            if i == n - 1 { gc = gcTx }
+            x11ImageText8(fd, win, gc, cx, y, lbl)
+            cx = cx + wseg
+            if i < n - 1 { x11ImageText8(fd, win, gcMut, cx + 4, y, ">")  cx = cx + charW() + 7 }
+            i += 1
+        }
+    }
+}
+// which breadcrumb ancestor path was clicked at ex (or "" if none)
+func crumbHit(cwd, x0, maxW, ex) {
+    let segs = crumbs(cwd)
+    let n = countLines(segs)
+    let cx = x0
+    let i = 0
+    while i < n {
+        let lbl = crumbLabel(nthLine(segs, i))
+        let wseg = len(lbl) * charW()
+        if cx + wseg > x0 + maxW { emit "" }
+        if ex >= cx && ex < cx + wseg { emit crumbPath(nthLine(segs, i)) }
+        cx = cx + wseg
+        if i < n - 1 { cx = cx + charW() + 7 }
+        i += 1
+    }
+    emit ""
+}
 
 // ── drawing ────────────────────────────────────────────────────────────
 // borderless circular button that blends into the toolbar: a soft filled
@@ -681,6 +749,14 @@ func drawViewToggle(fd, win, gcTx, x, vm) {
         x11FillRect(fd, win, gcTx, x + 9,  cy + 3, 6, 6)
         x11FillRect(fd, win, gcTx, x + 19, cy + 3, 6, 6)
     }
+}
+// search magnifier glyph (lens ring + handle), header-text color
+func drawSearchBtn(fd, win, gcTx, gcBg, x) {
+    let cx = x + 15  let cy = btnY() + 15
+    x11FillArc(fd, win, gcTx, cx - 6, cy - 6, 12, 12, 0, 23040)
+    x11FillArc(fd, win, gcBg, cx - 4, cy - 4, 8, 8, 0, 23040)
+    x11FillRect(fd, win, gcTx, cx + 3, cy + 3, 5, 2)
+    x11FillRect(fd, win, gcTx, cx + 6, cy + 4, 2, 4)
 }
 // address-bar text clipped to its field (shows the tail when too long)
 func addrShow(text, fieldW, focused) {
@@ -724,12 +800,16 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
     drawBtn(fd, win, gcBtn, backX(), backRaw, scratch, haveIcons, dark)
     drawBtn(fd, win, gcBtn, fwdX(), fwdRaw, scratch, haveIcons, dark)
     drawBtn(fd, win, gcBtn, refX(), reloadRaw, scratch, haveIcons, dark)
-    let afW = w - addrX() - VTW() - 24
+    let afW = w - addrX() - 2 * VTW() - 28
     roundRect(fd, win, gcAddrBd, addrX(), btnY(), afW, BTNW(), 8)
     roundRect(fd, win, gcAddr, addrX() + 1, btnY() + 1, afW - 2, BTNW() - 2, 7)
-    let shown = cwd
-    if addrFocused == 1 { shown = addr }
-    x11ImageText8(fd, win, gcAddrTx, addrX() + 12, btnY() + BTNW() / 2 + 4, addrShow(shown, afW - 18, addrFocused))
+    let pty = btnY() + BTNW() / 2 + 4
+    if addrFocused == 1 {
+        x11ImageText8(fd, win, gcAddrTx, addrX() + 12, pty, addrShow(addr, afW - 18, 1))
+    } else {
+        drawCrumbs(fd, win, gcAddrTx, gcSideTx, addrX() + 12, pty, afW - 18, cwd)
+    }
+    drawSearchBtn(fd, win, gcTitleTx, gcBar, w - 2 * VTW() - 16)
     drawViewToggle(fd, win, gcTitleTx, w - VTW() - 10, viewMode)
 
     // sidebar — combined model: headers + places (folder icon) + devices (drive)
@@ -1116,12 +1196,20 @@ just run {
                     } else if ex >= refX() && ex < refX() + BTNW() {
                         allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries
                         places = buildSidebar()
+                    } else if ex >= curW - 2 * VTW() - 16 && ex < curW - VTW() - 12 {
+                        searchMode = 1  searchText = ""  marked = ""
                     } else if ex >= curW - VTW() - 10 {
                         viewMode = 1 - viewMode  scroll = 0
                         exec("mkdir -p '" + homeDir() + "/.config/cortex'; printf %s \"$(test " + viewMode + " -eq 1 && echo list || echo grid)\" > '" + homeDir() + "/.config/cortex/view'")
                     } else if ex >= addrX() {
-                        addrFocused = 1
-                        addr = cwd
+                        let cbW = curW - addrX() - VTW() - 24 - 18
+                        let cp = crumbHit(cwd, addrX() + 12, cbW, ex)
+                        if cp != "" && cp != cwd {
+                            cwd = cp  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1
+                            allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries
+                            addr = cwd  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""
+                            x11SetTitle(fd, win, "cortex - " + basename(cwd))
+                        } else { addrFocused = 1  addr = cwd }
                     }
                     repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked, imageBig, archiveBig, mediaBig, viewMode, fileSml, docBig, dlBig, musicBig, picBig, vidBig, deskBig)
                 } else if ey >= TOP() {
