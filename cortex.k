@@ -342,8 +342,17 @@ func buildSidebar() {
 }
 
 // ── directory model ────────────────────────────────────────────────────
-func buildEntries(cwd) {
-    let raw = exec("ls -1Ap '" + cwd + "' 2>/dev/null")
+// open helpers
+func openFile(path) { exec("setsid xdg-open '" + path + "' >/dev/null 2>&1 &") }
+func newFolder(cwd) { exec("mkdir -p '" + cwd + "/New Folder'") }
+func openTerminal(cwd) {
+    exec("cd '" + cwd + "' && setsid sh -c '${TERMINAL:-$(command -v ghostty kitty alacritty foot wezterm xterm 2>/dev/null | head -1)}' >/dev/null 2>&1 &")
+}
+
+func buildEntries(cwd, showHidden) {
+    let flag = "-1p"
+    if showHidden == 1 { flag = "-1Ap" }
+    let raw = exec("ls " + flag + " '" + cwd + "' 2>/dev/null")
     let out = "d ..\n"
     let line = ""
     let i = 0
@@ -585,7 +594,8 @@ just run {
     let kmap = buildKeymap()
 
     let cwd = chomp(exec("pwd"))
-    let entries = buildEntries(cwd)
+    let showHidden = 0
+    let entries = buildEntries(cwd, showHidden)
     let places = buildSidebar()
     let sel = 0
     let lastRow = 0 - 1
@@ -620,11 +630,11 @@ just run {
                     // toolbar
                     addrFocused = 0
                     if ex >= backX() && ex < backX() + BTNW() {
-                        if histIdx > 0 { histIdx = histIdx - 1  cwd = nthLine(hist, histIdx)  entries = buildEntries(cwd)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }
+                        if histIdx > 0 { histIdx = histIdx - 1  cwd = nthLine(hist, histIdx)  entries = buildEntries(cwd, showHidden)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }
                     } else if ex >= fwdX() && ex < fwdX() + BTNW() {
-                        if histIdx < countLines(hist) - 1 { histIdx = histIdx + 1  cwd = nthLine(hist, histIdx)  entries = buildEntries(cwd)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }
+                        if histIdx < countLines(hist) - 1 { histIdx = histIdx + 1  cwd = nthLine(hist, histIdx)  entries = buildEntries(cwd, showHidden)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd)) }
                     } else if ex >= refX() && ex < refX() + BTNW() {
-                        entries = buildEntries(cwd)
+                        entries = buildEntries(cwd, showHidden)
                         places = buildSidebar()
                     } else if ex >= addrX() {
                         addrFocused = 1
@@ -648,7 +658,7 @@ just run {
                                 cwd = dest
                                 hist = truncLines(hist, histIdx + 1) + cwd + "\n"
                                 histIdx = countLines(hist) - 1
-                                entries = buildEntries(cwd)
+                                entries = buildEntries(cwd, showHidden)
                                 sel = 0
                                 places = buildSidebar()
                                 x11SetTitle(fd, win, "cortex - " + basename(cwd))
@@ -662,16 +672,20 @@ just run {
                         if col >= 0 && col < cols && idx >= 0 && idx < countLines(entries) {
                             let dbl = idx == lastRow && time - lastTime < 400
                             sel = idx
-                            if dbl && entryIsDir(entries, idx) {
+                            if dbl {
                                 let name = entryName(entries, idx)
-                                let dst = cwd
-                                if name == ".." { dst = parentDir(cwd) } else { dst = joinDir(cwd, name) }
-                                cwd = dst
-                                hist = truncLines(hist, histIdx + 1) + cwd + "\n"
-                                histIdx = countLines(hist) - 1
-                                entries = buildEntries(cwd)
-                                sel = 0
-                                x11SetTitle(fd, win, "cortex - " + basename(cwd))
+                                if entryIsDir(entries, idx) {
+                                    let dst = cwd
+                                    if name == ".." { dst = parentDir(cwd) } else { dst = joinDir(cwd, name) }
+                                    cwd = dst
+                                    hist = truncLines(hist, histIdx + 1) + cwd + "\n"
+                                    histIdx = countLines(hist) - 1
+                                    entries = buildEntries(cwd, showHidden)
+                                    sel = 0
+                                    x11SetTitle(fd, win, "cortex - " + basename(cwd))
+                                } else {
+                                    openFile(joinDir(cwd, name))   // open with default app
+                                }
                             }
                             lastRow = idx
                             lastTime = time
@@ -683,6 +697,7 @@ just run {
                 let kc = x11KeyDetail(ev)
                 let state = bufGetWordAt(ev, 28)
                 let shift = state - state / 2 * 2
+                let ctrl = state / 4 - state / 8 * 2
                 if addrFocused == 1 {
                     // editing the address bar
                     if kc == 9 { addrFocused = 0 }                              // Esc
@@ -691,7 +706,7 @@ just run {
                             cwd = chomp(addr)
                             hist = truncLines(hist, histIdx + 1) + cwd + "\n"
                             histIdx = countLines(hist) - 1
-                            entries = buildEntries(cwd)
+                            entries = buildEntries(cwd, showHidden)
                             sel = 0
                             x11SetTitle(fd, win, "cortex - " + basename(cwd))
                         }
@@ -705,19 +720,22 @@ just run {
                     repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml)
                 } else {
                     if kc == 9 { running = 0 }                                  // Esc
-                    else if kc == 36 {                                          // Enter -> open sel
+                    else if kc == 36 {                                          // Enter -> open sel (dir) / open file
                         if entryIsDir(entries, sel) {
                             let name = entryName(entries, sel)
                             if name == ".." { cwd = parentDir(cwd) } else { cwd = joinDir(cwd, name) }
                             hist = truncLines(hist, histIdx + 1) + cwd + "\n"
                             histIdx = countLines(hist) - 1
-                            entries = buildEntries(cwd)
+                            entries = buildEntries(cwd, showHidden)
                             sel = 0
                             x11SetTitle(fd, win, "cortex - " + basename(cwd))
-                        }
+                        } else { openFile(joinDir(cwd, entryName(entries, sel))) }
                         repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml)
                     }
-                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  entries = buildEntries(cwd)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
+                    else if kc == 43 && ctrl == 1 { if showHidden == 1 { showHidden = 0 } else { showHidden = 1 }  entries = buildEntries(cwd, showHidden)  sel = 0  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }  // Ctrl+H hidden
+                    else if kc == 57 { newFolder(cwd)  entries = buildEntries(cwd, showHidden)  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }  // n new folder
+                    else if kc == 28 { openTerminal(cwd) }                       // t terminal here
+                    else if kc == 22 { cwd = parentDir(cwd)  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  entries = buildEntries(cwd, showHidden)  sel = 0  x11SetTitle(fd, win, "cortex - " + basename(cwd))  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
                     else if kc == 56 { addBookmark(cwd)  places = buildSidebar()  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
                     else if kc == 116 { let c = gridCols(curW)  if sel + c < countLines(entries) { sel = sel + c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
                     else if kc == 111 { let c = gridCols(curW)  if sel - c >= 0 { sel = sel - c }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml) }
