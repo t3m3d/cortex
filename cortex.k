@@ -13,6 +13,7 @@ func H()         { emit 620 }
 func TITLEH()    { emit 26 }
 func TBARH()     { emit 52 }
 func TOP()       { emit 78 }          // TITLEH + TBARH (content origin y)
+func STATUSH()   { emit 24 }          // bottom status bar
 func TBICON()    { emit 22 }          // toolbar button glyph size
 func ROWH()      { emit 24 }
 func SIDEBAR()   { emit 190 }
@@ -361,6 +362,13 @@ func buildEntries(cwd) {
 }
 func entryIsDir(entries, row) { emit nthLine(entries, row)[0] == "d" }
 func entryName(entries, row)  { let l = nthLine(entries, row)  emit substring(l, 2, len(l)) }
+
+func buildStatus(cwd, entries) {
+    let n = countLines(entries) - 1   // minus ".."
+    if n < 0 { n = 0 }
+    let free = chomp(exec("df -h --output=avail '" + cwd + "' 2>/dev/null | tail -1 | tr -d ' '"))
+    emit n + " items     " + free + " free"
+}
 func parentDir(cwd) {
     let i = len(cwd) - 1
     while i > 0 && cwd[i] != "/" { i = i - 1 }
@@ -415,11 +423,13 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
     let gcAddrBd = x11GenId(info, 20)
     let gcBtnBd = x11GenId(info, 21)
     let gcAddrTx = x11GenId(info, 22)
+    let gcStat = x11GenId(info, 23)
 
+    let sy = h - STATUSH()
     // base + chrome
     x11FillRect(fd, win, gcClear, 0, 0, w, h)
-    x11FillRect(fd, win, gcSide, 0, TOP(), SIDEBAR(), h - TOP())
-    x11FillRect(fd, win, gcDiv, SIDEBAR(), TOP(), 1, h - TOP())
+    x11FillRect(fd, win, gcSide, 0, TOP(), SIDEBAR(), sy - TOP())
+    x11FillRect(fd, win, gcDiv, SIDEBAR(), TOP(), 1, sy - TOP())
 
     // title bar
     x11FillRect(fd, win, gcTitle, 0, 0, w, TITLEH())
@@ -485,6 +495,15 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
         x11ImageText8(fd, win, lblGc, lx, cy + 10 + ICONBIG() + 16, disp)
         i += 1
     }
+
+    // status bar (bottom, full width)
+    x11FillRect(fd, win, gcBar, 0, sy, w, STATUSH())
+    x11FillRect(fd, win, gcDiv, 0, sy, w, 1)
+    x11ImageText8(fd, win, gcStat, 10, sy + 16, buildStatus(cwd, entries))
+    if sel >= 0 && sel < nrows {
+        let snm = entryName(entries, sel)
+        x11ImageText8(fd, win, gcStat, w - len(snm) * charW() - 12, sy + 16, snm)
+    }
 }
 
 just run {
@@ -527,6 +546,7 @@ just run {
     let gcAddrBd  = x11GenId(info, 20)  x11CreateGC(fd, gcAddrBd,  win, cAddrBd(dark), cAddrBd(dark), font)
     let gcBtnBd   = x11GenId(info, 21)  x11CreateGC(fd, gcBtnBd,   win, cBg(dark),     cBg(dark),     font)
     let gcAddrTx  = x11GenId(info, 22)  x11CreateGC(fd, gcAddrTx,  win, cText(dark),   cAddr(dark),   font)
+    let gcStat    = x11GenId(info, 23)  x11CreateGC(fd, gcStat,    win, cSideTx(dark), cToolbar(dark),font)
 
     x11MapWindow(fd, win)
 
