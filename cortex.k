@@ -25,19 +25,20 @@ func cBlack()     { emit 0 }
 func cGreen()     { emit 2073699 }   // 0x1FA463 accent (both themes)
 func cFolder()    { emit 15909198 }  // fallback rects
 func cFile()      { emit 12434877 }
-func cBg(d)       { emit pick(d, rgb(255,255,255), rgb(27,29,34)) }     // window / main / rows
-func cText(d)     { emit pick(d, rgb(32,33,36),    rgb(227,229,233)) }
-func cTitle(d)    { emit pick(d, rgb(237,239,242), rgb(22,24,28)) }
-func cTitleTx(d)  { emit pick(d, rgb(60,64,67),    rgb(200,205,212)) }
-func cToolbar(d)  { emit pick(d, rgb(222,227,233), rgb(36,39,46)) }
-func cBtn(d)      { emit pick(d, rgb(233,237,241), rgb(46,50,59)) }     // soft circle
-func cAddr(d)     { emit pick(d, rgb(255,255,255), rgb(42,46,54)) }
-func cAddrBd(d)   { emit pick(d, rgb(194,200,208), rgb(60,65,75)) }
-func cSide(d)     { emit pick(d, rgb(241,243,245), rgb(32,35,41)) }
-func cSideTx(d)   { emit pick(d, rgb(60,64,67),    rgb(192,197,205)) }
-func cDivider(d)  { emit pick(d, rgb(214,219,224), rgb(51,55,63)) }
+func cBg(d)       { emit pick(d, rgb(255,255,255), rgb(30,30,32)) }     // window / main / rows (#1e1e20)
+func cText(d)     { emit pick(d, rgb(32,33,36),    rgb(232,232,235)) }
+func cTitle(d)    { emit pick(d, rgb(247,248,249), rgb(43,43,46)) }     // header bar (#2b2b2e)
+func cTitleTx(d)  { emit pick(d, rgb(50,52,56),    rgb(228,230,233)) }
+func cToolbar(d)  { emit pick(d, rgb(247,248,249), rgb(43,43,46)) }     // merged into header
+func cBtn(d)      { emit pick(d, rgb(233,236,240), rgb(56,56,60)) }     // soft circle / hover
+func cAddr(d)     { emit pick(d, rgb(255,255,255), rgb(56,56,60)) }     // path pill
+func cAddrBd(d)   { emit pick(d, rgb(206,210,216), rgb(56,56,60)) }
+func cSide(d)     { emit pick(d, rgb(246,247,248), rgb(36,36,38)) }     // sidebar (#242426)
+func cSideTx(d)   { emit pick(d, rgb(60,64,67),    rgb(206,208,212)) }
+func cDivider(d)  { emit pick(d, rgb(222,226,230), rgb(48,48,51)) }
 func cSel(d)      { emit pick(d, rgb(31,164,99),   rgb(52,199,126)) }   // krypton green
-func cSelLite(d)  { emit pick(d, rgb(216,242,228), rgb(26,58,44)) }     // soft green selection
+func cSelLite(d)  { emit pick(d, rgb(216,242,228), rgb(30,72,52)) }     // soft green selection
+func cPill(d)     { emit pick(d, rgb(232,234,237), rgb(54,54,58)) }     // sidebar hover/selected pill
 func cMenu(d)     { emit pick(d, rgb(255,255,255), rgb(40,43,50)) }
 func cMenuHi(d)   { emit pick(d, rgb(31,164,99),   rgb(52,199,126)) }
 func MENUW()      { emit 168 }
