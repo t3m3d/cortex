@@ -597,6 +597,7 @@ just run {
     let wmProtocols = x11InternAtom(fd, "WM_PROTOCOLS")
     let wmDelete = x11InternAtom(fd, "WM_DELETE_WINDOW")
     x11SetWmProtocols(fd, win, wmProtocols, wmDelete)
+    let netIcon = x11InternAtom(fd, "_NET_WM_ICON")   // intern before mapping (has a reply)
 
     let font = x11GenId(info, 2)
     x11OpenFont(fd, font, "fixed")
@@ -644,6 +645,15 @@ just run {
         folderBig = hexToBuf(folderBigHex, iconBytes(big))
         fileBig   = hexToBuf(fileBigHex, iconBytes(big))
         if len(driveSmlHex) >= iconBytes(sml) * 2 { driveSml = hexToBuf(driveSmlHex, iconBytes(sml)) }
+        // _NET_WM_ICON: [w, h, w*h ARGB]. BGRA bytes == LE CARDINAL of 0xAARRGGBB,
+        // so the folder raster doubles as the icon pixels (taskbar/alt-tab icon).
+        let npx = big * big
+        let ib = bufNew(8 + npx * 4)
+        bufSetByte(ib, 0, big)
+        bufSetByte(ib, 4, big)
+        let k = 0
+        while k < npx * 4 { bufSetByte(ib, 8 + k, bufGetByte(folderBig, k))  k += 1 }
+        x11ChangeProp32(fd, win, netIcon, 6, ib, 2 + npx)
     }
     // toolbar glyphs (green)
     let backRaw = bufNew(iconBytes(tbz))
@@ -722,6 +732,17 @@ just run {
                         else if mi == 7 { openTerminal(cwd) }
                     }
                     repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY)
+                } else if btn == 3 && ex < SIDEBAR() && ey >= TOP() {
+                    // right-click a drive in the sidebar -> unmount/eject it
+                    let pr = (ey - TOP()) / ROWH()
+                    if pr >= 0 && pr < countLines(places) {
+                        let line = nthLine(places, pr)
+                        if fieldAt(line, 0) == "d" && fieldAt(line, 2) != "" {
+                            exec("udisksctl unmount -b '" + fieldAt(line, 3) + "' >/dev/null 2>&1")
+                            places = buildSidebar()
+                            repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY)
+                        }
+                    }
                 } else if btn == 3 {
                     // right-click -> open context menu over the cell under cursor
                     menuTarget = 0 - 1
