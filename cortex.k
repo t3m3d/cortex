@@ -743,6 +743,7 @@ just run {
     let cwd = chomp(exec("pwd"))
     let savedDir = chomp(readFile(lastDirPath()))
     if savedDir != "" && chomp(exec("test -d '" + savedDir + "' && echo 1")) == "1" { cwd = savedDir }
+    x11SetTitle(fd, win, "cortex - " + basename(cwd))
     let showHidden = 0
     let sortMode = 0
     let searchMode = 0
