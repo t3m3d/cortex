@@ -63,8 +63,12 @@ func _wlFind(b, n, iface) {
 }
 
 // ── file model (dirs-first, like cortex) ────────────────────────────────────
-func buildEntries(cwd) {
-    let raw = exec("ls -1p '" + cwd + "' 2>/dev/null")
+func openFile(path) { shellRun("xdg-open '" + path + "' >/dev/null 2>&1 &") }
+func openTerm(cwd) { shellRun("cd '" + cwd + "' && setsid sh -c '${TERMINAL:-$(command -v ghostty kitty alacritty foot xterm 2>/dev/null | head -1)}' >/dev/null 2>&1 &") }
+func buildEntries(cwd, showHidden) {
+    let flag = "-1p"
+    if showHidden == 1 { flag = "-1pA" }
+    let raw = exec("ls " + flag + " '" + cwd + "' 2>/dev/null")
     let dirs = ""
     let files = ""
     let line = ""
@@ -307,6 +311,8 @@ func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlB
         }
         i += 1
     }
+    fbFillRect(px, W, SIDEW(), H - 22, W - SIDEW(), 22, cHdr())
+    fbDrawText(px, W, H, font, SIDEW() + 12, H - 8, (countLines(ent) - 1) + " items", cMuted())
 }
 
 just run {
@@ -333,7 +339,8 @@ just run {
 
     let W = 900  let H = 600
     let cwd = chomp(exec("printf %s \"$HOME\""))
-    let ent = buildEntries(cwd)
+    let showHidden = 0
+    let ent = buildEntries(cwd, showHidden)
     let sel = 0  let scroll = 0
     let font = wlFontLoad()
     let big = IBIG()
@@ -352,7 +359,7 @@ just run {
     let places     = buildPlaces()
     let nextId = 12
     let prevBuf = 0  let prevPool = 0  let prevMfd = 0
-    let mouseX = 0  let mouseY = 0
+    let mouseX = 0  let mouseY = 0  let ctrlDown = 0  let altDown = 0
 
     let running = 1
     while running == 1 {
@@ -385,12 +392,16 @@ just run {
                             if entIsDir(ent, sel) {
                                 let nm = entName(ent, sel)
                                 if nm == ".." { cwd = parentDir(cwd) } else { cwd = joinDir(cwd, nm) }
-                                ent = buildEntries(cwd)  sel = 0  scroll = 0
+                                ent = buildEntries(cwd, showHidden)  sel = 0  scroll = 0
                                 wlSetTitle(fd, TOP, "cortex - " + basename(cwd))
-                            }
+                            } else { openFile(joinDir(cwd, entName(ent, sel))) }
                         }
-                        if kc == 22 { cwd = parentDir(cwd)  ent = buildEntries(cwd)  sel = 0  scroll = 0 }  // Backspace
+                        if kc == 22 { cwd = parentDir(cwd)  ent = buildEntries(cwd, showHidden)  sel = 0  scroll = 0 }  // Backspace
                         if kc == 9 { running = 0 }                                          // Esc
+                        if kc == 43 && ctrlDown == 1 { showHidden = 1 - showHidden  ent = buildEntries(cwd, showHidden)  sel = 0  scroll = 0 }  // Ctrl+H hidden
+                        if kc == 70 { openTerm(cwd) }                                        // F4 terminal
+                        if kc == 71 { ent = buildEntries(cwd, showHidden) }                  // F5 refresh
+                        if kc == 110 && altDown == 1 { cwd = homeDir()  ent = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }  // Alt+Home
                         // keep selection visible
                         let vis = (H - HDRH() - PAD() - 10) / CELLH()
                         let srow = sel / cols
@@ -398,6 +409,11 @@ just run {
                         if srow >= scroll + vis { scroll = srow - vis + 1 }
                         dirty = 1
                     }
+                }
+                if obj == KB && op == 4 {
+                    let dep = wlU32(eb, off + 12)
+                    ctrlDown = dep / 4 - dep / 8 * 2
+                    altDown = dep / 8 - dep / 16 * 2
                 }
                 if obj == PTR && op == 0 { mouseX = wlFixed(eb, off + 16)  mouseY = wlFixed(eb, off + 20) }
                 if obj == PTR && op == 2 { mouseX = wlFixed(eb, off + 12)  mouseY = wlFixed(eb, off + 16) }
@@ -407,7 +423,7 @@ just run {
                             let prow = (mouseY - PLY() + 4) / 30
                             if prow >= 0 && prow < countLines(places) {
                                 let tgt = plPath(nthLine(places, prow))
-                                if tgt != cwd { cwd = tgt  ent = buildEntries(cwd)  sel = 0  scroll = 0  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }
+                                if tgt != cwd { cwd = tgt  ent = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }
                             }
                             dirty = 1
                         }
@@ -420,7 +436,7 @@ just run {
                                 if idx == sel && entIsDir(ent, idx) {
                                     let nm = entName(ent, idx)
                                     if nm == ".." { cwd = parentDir(cwd) } else { cwd = joinDir(cwd, nm) }
-                                    ent = buildEntries(cwd)  sel = 0  scroll = 0
+                                    ent = buildEntries(cwd, showHidden)  sel = 0  scroll = 0
                                     wlSetTitle(fd, TOP, "cortex - " + basename(cwd))
                                 } else { sel = idx }
                             }
