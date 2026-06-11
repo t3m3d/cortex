@@ -721,7 +721,16 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
             x11ImageText8(fd, win, gcSideTx, 12, y + 17, fieldAt(line, 1))
         } else {
             let rowBg = cSide(dark)
-            if fieldAt(line, 2) == cwd { x11FillRect(fd, win, gcSelBox, 0, y, SIDEBAR(), ROWH())  rowBg = cSelLite(dark) }
+            if fieldAt(line, 2) == cwd {
+                let px0 = 6  let py0 = y + 2  let pw = SIDEBAR() - 12  let ph = ROWH() - 4
+                x11FillRect(fd, win, gcSelBox, px0 + 8, py0, pw - 16, ph)
+                x11FillRect(fd, win, gcSelBox, px0, py0 + 8, pw, ph - 16)
+                x11FillArc(fd, win, gcSelBox, px0, py0, 16, 16, 0, 23040)
+                x11FillArc(fd, win, gcSelBox, px0 + pw - 16, py0, 16, 16, 0, 23040)
+                x11FillArc(fd, win, gcSelBox, px0, py0 + ph - 16, 16, 16, 0, 23040)
+                x11FillArc(fd, win, gcSelBox, px0 + pw - 16, py0 + ph - 16, 16, 16, 0, 23040)
+                rowBg = cSelLite(dark)
+            }
             if haveIcons == 1 {
                 if kind == "d" { blitIcon(fd, win, gcRow, 10, y + 2, driveSml, scratch, rowBg, ICONSML()) }
                 else { blitIcon(fd, win, gcRow, 10, y + 2, folderSml, scratch, rowBg, ICONSML()) }
