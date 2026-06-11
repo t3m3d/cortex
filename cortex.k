@@ -10,9 +10,10 @@ import "k:x11"
 // ── geometry / colors (24-bit TrueColor: pixel = R<<16 | G<<8 | B) ─────
 func W()         { emit 1000 }
 func H()         { emit 620 }
-func TITLEH()    { emit 26 }
+func TITLEH()    { emit 0 }           // no separate title strip (single header bar)
 func TBARH()     { emit 52 }
-func TOP()       { emit 78 }          // TITLEH + TBARH (content origin y)
+func TOP()       { emit 52 }           // single header height (content origin y)
+func VTW()       { emit 36 }           // view-toggle button width
 func STATUSH()   { emit 24 }          // bottom status bar
 func TBICON()    { emit 22 }          // toolbar button glyph size
 func ROWH()      { emit 24 }
@@ -666,6 +667,21 @@ func drawBtn(fd, win, gcCircle, x, raw, scratch, haveIcons, dark) {
     }
 }
 
+// view-toggle glyph (flat, header-text color): shows the OTHER view's icon —
+// list-lines while in grid, 2x2 grid while in list.
+func drawViewToggle(fd, win, gcTx, x, vm) {
+    let cy = btnY() + 18
+    if vm == 0 {
+        x11FillRect(fd, win, gcTx, x + 9, cy - 7, 18, 2)
+        x11FillRect(fd, win, gcTx, x + 9, cy - 1, 18, 2)
+        x11FillRect(fd, win, gcTx, x + 9, cy + 5, 18, 2)
+    } else {
+        x11FillRect(fd, win, gcTx, x + 9,  cy - 7, 6, 6)
+        x11FillRect(fd, win, gcTx, x + 19, cy - 7, 6, 6)
+        x11FillRect(fd, win, gcTx, x + 9,  cy + 3, 6, 6)
+        x11FillRect(fd, win, gcTx, x + 19, cy + 3, 6, 6)
+    }
+}
 // address-bar text clipped to its field (shows the tail when too long)
 func addrShow(text, fieldW, focused) {
     let max = fieldW / charW() - 1
@@ -703,22 +719,18 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
     x11FillRect(fd, win, gcSide, 0, TOP(), SIDEBAR(), sy - TOP())
     x11FillRect(fd, win, gcDiv, SIDEBAR(), TOP(), 1, sy - TOP())
 
-    // title bar
-    x11FillRect(fd, win, gcTitle, 0, 0, w, TITLEH())
-    x11ImageText8(fd, win, gcTitleTx, 10, 18, "cortex   " + cwd)
-
-    // toolbar
-    x11FillRect(fd, win, gcBar, 0, TITLEH(), w, TBARH())
+    // single flat header bar: back/fwd/reload + rounded path pill + view toggle
+    x11FillRect(fd, win, gcBar, 0, 0, w, TBARH())
     drawBtn(fd, win, gcBtn, backX(), backRaw, scratch, haveIcons, dark)
     drawBtn(fd, win, gcBtn, fwdX(), fwdRaw, scratch, haveIcons, dark)
     drawBtn(fd, win, gcBtn, refX(), reloadRaw, scratch, haveIcons, dark)
-    // address field (aligned with the buttons)
-    let afW = w - addrX() - 10
-    x11FillRect(fd, win, gcAddrBd, addrX(), btnY(), afW, BTNW())
-    x11FillRect(fd, win, gcAddr, addrX() + 1, btnY() + 1, afW - 2, BTNW() - 2)
+    let afW = w - addrX() - VTW() - 24
+    roundRect(fd, win, gcAddrBd, addrX(), btnY(), afW, BTNW(), 8)
+    roundRect(fd, win, gcAddr, addrX() + 1, btnY() + 1, afW - 2, BTNW() - 2, 7)
     let shown = cwd
     if addrFocused == 1 { shown = addr }
-    x11ImageText8(fd, win, gcAddrTx, addrX() + 8, btnY() + BTNW() / 2 + 4, addrShow(shown, afW - 12, addrFocused))
+    x11ImageText8(fd, win, gcAddrTx, addrX() + 12, btnY() + BTNW() / 2 + 4, addrShow(shown, afW - 18, addrFocused))
+    drawViewToggle(fd, win, gcTitleTx, w - VTW() - 10, viewMode)
 
     // sidebar — combined model: headers + places (folder icon) + devices (drive)
     let np = countLines(places)
@@ -1104,6 +1116,9 @@ just run {
                     } else if ex >= refX() && ex < refX() + BTNW() {
                         allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries
                         places = buildSidebar()
+                    } else if ex >= curW - VTW() - 10 {
+                        viewMode = 1 - viewMode  scroll = 0
+                        exec("mkdir -p '" + homeDir() + "/.config/cortex'; printf %s \"$(test " + viewMode + " -eq 1 && echo list || echo grid)\" > '" + homeDir() + "/.config/cortex/view'")
                     } else if ex >= addrX() {
                         addrFocused = 1
                         addr = cwd
