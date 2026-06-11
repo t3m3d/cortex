@@ -44,7 +44,7 @@ func MENUW()      { emit 168 }
 func MENUROW()    { emit 26 }
 func menuItems()  { emit "Open\nCut\nCopy\nPaste\nRename\nMove to Trash\nNew Folder\nOpen Terminal\nDuplicate\nCompress\nProperties" }
 func helpText() {
-    emit "cortex — keyboard shortcuts\n \nEnter / double-click    open file or folder\nBackspace               go up\nAlt+Left / Alt+Right    back / forward\nAlt+Home                home folder\ntype a name             jump to it\narrows / PageUp/Down     move selection\nHome / End              first / last\nCtrl+L                  edit address bar\nF2                      rename\nSpace                   mark / unmark item\nCtrl+A                  select all\nCtrl+Shift+A            clear selection\nDelete                  trash selection (or item)\nCtrl+C / X / V          copy / cut / paste\nCtrl+N                  new file\nCtrl+Shift+N            new folder\nCtrl+I                  properties\nCtrl+Shift+C            copy path\nCtrl+H                  toggle hidden\nCtrl+S                  cycle sort\nCtrl+F                  search in folder\nF5                      refresh\nCtrl+D                  bookmark dir\nCtrl+Shift+D            remove bookmark\nCtrl+E                  extract archive\nCtrl+Shift+Z            compress to zip\nCtrl+Shift+R            duplicate\nCtrl+Shift+T            trash view\nCtrl+M                  mount all drives\nF4                      open terminal here\nright-click             context menu\nright-click a drive     unmount it\nF1                      this help\nEsc                     close / quit"
+    emit "cortex — keyboard shortcuts\n \nEnter / double-click    open file or folder\nBackspace               go up\nAlt+Left / Alt+Right    back / forward\nAlt+Home                home folder\ntype a name             jump to it\narrows / PageUp/Down     move selection\nHome / End              first / last\nCtrl+L                  edit address bar\nF2                      rename\nSpace                   mark / unmark item\nCtrl+A                  select all\nCtrl+Shift+A            clear selection\nDelete                  trash selection (or item)\nCtrl+C / X / V          copy / cut / paste\nCtrl+N                  new file\nCtrl+Shift+N            new folder\nCtrl+I                  properties\nCtrl+Shift+C            copy path\nCtrl+H                  toggle hidden\nCtrl+S                  cycle sort\nCtrl+F                  search (Enter = subfolders)\nF5                      refresh\nCtrl+D                  bookmark dir\nCtrl+Shift+D            remove bookmark\nCtrl+E                  extract archive\nCtrl+Shift+Z            compress to zip\nCtrl+Shift+R            duplicate\nCtrl+Shift+T            trash view\nCtrl+M                  mount all drives\nF4                      open terminal here\nright-click             context menu\nright-click a drive     unmount it\nF1                      this help\nEsc                     close / quit"
 }
 func ICONSML()   { emit 20 }
 func ICONBIG()   { emit 96 }
@@ -559,6 +559,12 @@ func containsCI(s, q) {
         i += 1
     }
     emit 0
+}
+// recursive search: find -printf '%y %P' emits 'd path'/'f path' lines that
+// match cortex's entry format exactly; relative paths work with joinDir.
+func deepFind(cwd, q) {
+    if q == "" { emit "d ..\n" }
+    emit "d ..\n" + chomp(exec("cd '" + cwd + "' && find . -mindepth 1 -iname '*" + q + "*' -not -path '*/.*/*' -printf '%y %P\\n' 2>/dev/null | head -300"))
 }
 // filter an entry list to names containing `q` (case-insensitive); keeps ".."
 func filterEntries(all, q) {
@@ -1095,7 +1101,7 @@ just run {
                 } else if searchMode == 1 {
                     // incremental filter of the current folder
                     if kc == 9 { searchMode = 0  searchText = ""  marked = ""  entries = allEntries  sel = 0 }
-                    else if kc == 36 { searchMode = 0 }
+                    else if kc == 36 { allEntries = deepFind(cwd, searchText)  entries = allEntries  searchMode = 0  sel = 0  scroll = 0 }
                     else if kc == 22 { if len(searchText) > 0 { searchText = substring(searchText, 0, len(searchText) - 1) }  entries = filterEntries(allEntries, searchText)  sel = 0 }
                     else {
                         let ch = keyChar(kmap, kc, shift)
