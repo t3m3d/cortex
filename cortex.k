@@ -21,8 +21,8 @@ func cBlack()    { emit 0 }
 func cTitle()    { emit 2302254 }     // 0x23262E dark title bar
 func cTitleTx()  { emit 14869218 }    // 0xE2E6EA
 func cToolbar()  { emit 14606558 }    // 0xDEE3E9
-func cBtn()      { emit 16777215 }    // white button face
-func cBtnBd()    { emit 12434877 }    // 0xBDC4CD button border
+func cBtn()      { emit 15330801 }    // 0xE9EDF1 soft circle (blends w/ toolbar)
+func cBtnBd()    { emit 12434877 }    // (unused now)
 func cGreen()    { emit 2073699 }     // 0x1FA463 accent green
 func cAddr()     { emit 16777215 }    // address field bg (white)
 func cAddrBd()   { emit 11119017 }    // 0xA9B2BD border
@@ -293,13 +293,16 @@ func joinDir(cwd, name) {
 }
 
 // ── drawing ────────────────────────────────────────────────────────────
-// white square button with a bordered face + a centered green glyph icon
-func drawBtn(fd, win, gcWhite, gcBd, x, raw, scratch, haveIcons) {
-    x11FillRect(fd, win, gcBd, x, btnY(), BTNW(), BTNW())
-    x11FillRect(fd, win, gcWhite, x + 1, btnY() + 1, BTNW() - 2, BTNW() - 2)
+// borderless circular button that blends into the toolbar: a soft filled
+// circle (cBtn, a hair off the bar colour) with the green glyph composited
+// onto that same colour so its square corners vanish inside the circle.
+func drawBtn(fd, win, gcCircle, x, raw, scratch, haveIcons) {
+    let d = 34
+    let off = (BTNW() - d) / 2
+    x11FillArc(fd, win, gcCircle, x + off, btnY() + off, d, d, 0, 23040)
     if haveIcons == 1 {
         let io = (BTNW() - TBICON()) / 2
-        blitIcon(fd, win, gcWhite, x + io, btnY() + io, raw, scratch, cWhite(), TBICON())
+        blitIcon(fd, win, gcCircle, x + io, btnY() + io, raw, scratch, cBtn(), TBICON())
     }
 }
 
@@ -343,9 +346,9 @@ func repaint(fd, info, cwd, entries, sel, places, w, h, folderSml, folderBig, fi
 
     // toolbar
     x11FillRect(fd, win, gcBar, 0, TITLEH(), w, TBARH())
-    drawBtn(fd, win, gcBtn, gcBtnBd, backX(), backRaw, scratch, haveIcons)
-    drawBtn(fd, win, gcBtn, gcBtnBd, fwdX(), fwdRaw, scratch, haveIcons)
-    drawBtn(fd, win, gcBtn, gcBtnBd, refX(), reloadRaw, scratch, haveIcons)
+    drawBtn(fd, win, gcBtn, backX(), backRaw, scratch, haveIcons)
+    drawBtn(fd, win, gcBtn, fwdX(), fwdRaw, scratch, haveIcons)
+    drawBtn(fd, win, gcBtn, refX(), reloadRaw, scratch, haveIcons)
     // address field (aligned with the buttons)
     let afW = w - addrX() - 10
     x11FillRect(fd, win, gcAddrBd, addrX(), btnY(), afW, BTNW())
