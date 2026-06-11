@@ -273,6 +273,7 @@ func detectDark() {
 }
 func existsDir(p) { emit chomp(exec("test -d '" + p + "' && echo y")) == "y" }
 func bookmarksPath() { emit homeDir() + "/.config/cortex/bookmarks" }
+func lastDirPath() { emit homeDir() + "/.config/cortex/lastdir" }
 func addPlace(out, label, path) { emit out + label + "|" + path + "\n" }
 func maybeAdd(out, label, path) {
     if existsDir(path) { emit addPlace(out, label, path) }
@@ -740,6 +741,8 @@ just run {
     let kmap = buildKeymap()
 
     let cwd = chomp(exec("pwd"))
+    let savedDir = chomp(readFile(lastDirPath()))
+    if savedDir != "" && chomp(exec("test -d '" + savedDir + "' && echo 1")) == "1" { cwd = savedDir }
     let showHidden = 0
     let sortMode = 0
     let searchMode = 0
@@ -1048,5 +1051,7 @@ just run {
             }
         }
     }
+    exec("mkdir -p '" + homeDir() + "/.config/cortex' 2>/dev/null")
+    writeFile(lastDirPath(), cwd)
     sockClose(fd)
 }
