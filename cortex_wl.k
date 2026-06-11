@@ -367,6 +367,7 @@ just run {
     let prevBuf = 0  let prevPool = 0  let prevMfd = 0
     let mouseX = 0  let mouseY = 0  let ctrlDown = 0  let altDown = 0
     let hist = cwd + "\n"  let histIdx = 0  let lastCwd = cwd  let fromHist = 0
+    let shiftDown = 0  let clipboard = ""  let clipOp = ""
 
     let running = 1
     while running == 1 {
@@ -409,6 +410,12 @@ just run {
                         if kc == 70 { openTerm(cwd) }                                        // F4 terminal
                         if kc == 71 { ent = buildEntries(cwd, showHidden) }                  // F5 refresh
                         if kc == 110 && altDown == 1 { cwd = homeDir()  ent = buildEntries(cwd, showHidden)  sel = 0  scroll = 0  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }  // Alt+Home
+                        if kc == 54 && ctrlDown == 1 { if entName(ent, sel) != ".." { clipboard = joinDir(cwd, entName(ent, sel))  clipOp = "copy" } }  // Ctrl+C
+                        if kc == 53 && ctrlDown == 1 { if entName(ent, sel) != ".." { clipboard = joinDir(cwd, entName(ent, sel))  clipOp = "cut" } }   // Ctrl+X
+                        if kc == 55 && ctrlDown == 1 { if clipboard != "" { if clipOp == "cut" { shellRun("mv --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null")  clipboard = "" } else { shellRun("cp -r --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null") }  ent = buildEntries(cwd, showHidden) } }  // Ctrl+V
+                        if kc == 119 { if entName(ent, sel) != ".." { shellRun("gio trash '" + joinDir(cwd, entName(ent, sel)) + "' 2>/dev/null || trash-put '" + joinDir(cwd, entName(ent, sel)) + "' 2>/dev/null")  ent = buildEntries(cwd, showHidden)  if sel >= countLines(ent) { sel = countLines(ent) - 1 } } }  // Delete -> trash
+                        if kc == 57 && ctrlDown == 1 && shiftDown == 1 { shellRun("mkdir -p '" + cwd + "/New Folder'")  ent = buildEntries(cwd, showHidden) }  // Ctrl+Shift+N new folder
+                        if kc == 57 && ctrlDown == 1 && shiftDown == 0 { shellRun("touch '" + cwd + "/New File'")  ent = buildEntries(cwd, showHidden) }  // Ctrl+N new file
                         // keep selection visible
                         let vis = (H - HDRH() - PAD() - 10) / CELLH()
                         let srow = sel / cols
@@ -419,6 +426,7 @@ just run {
                 }
                 if obj == KB && op == 4 {
                     let dep = wlU32(eb, off + 12)
+                    shiftDown = dep - dep / 2 * 2
                     ctrlDown = dep / 4 - dep / 8 * 2
                     altDown = dep / 8 - dep / 16 * 2
                 }
