@@ -376,6 +376,31 @@ func trashMarked(cwd, marked) {
         i += 1
     }
 }
+// newline-joined absolute paths of the marked entries (for the clipboard)
+func clipFromMarked(cwd, marked) {
+    let out = ""
+    let n = countLines(marked)
+    let i = 0
+    while i < n {
+        let nm = nthLine(marked, i)
+        if nm != "" && nm != ".." { let p = joinDir(cwd, nm)  if out == "" { out = p } else { out = out + fromCharCode(10) + p } }
+        i += 1
+    }
+    emit out
+}
+// paste each clipboard path (newline-joined) into cwd; op = "cut" moves, else copies
+func pasteClip(cwd, clipboard, op) {
+    let n = countLines(clipboard)
+    let i = 0
+    while i < n {
+        let src = nthLine(clipboard, i)
+        if src != "" {
+            if op == "cut" { exec("mv --backup=numbered '" + src + "' '" + cwd + "/' 2>/dev/null") }
+            else { exec("cp -r --backup=numbered '" + src + "' '" + cwd + "/' 2>/dev/null") }
+        }
+        i += 1
+    }
+}
 func newFile(cwd) { exec("touch '" + cwd + "/New File'") }
 func copyPath(path) { exec("printf '%s' '" + path + "' | wl-copy 2>/dev/null || printf '%s' '" + path + "' | xclip -sel clip 2>/dev/null") }
 func showProps(path, name) {
@@ -872,7 +897,7 @@ just run {
                         if mi == 0 { if tgt >= 0 { if entryIsDir(entries, tgt) { let nm = entryName(entries, tgt)  if nm == ".." { cwd = parentDir(cwd) } else { cwd = joinDir(cwd, nm) }  hist = truncLines(hist, histIdx + 1) + cwd + "\n"  histIdx = countLines(hist) - 1  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  sel = 0  scroll = 0  searchMode = 0  searchText = ""  marked = ""  x11SetTitle(fd, win, "cortex - " + basename(cwd)) } else { openFile(joinDir(cwd, entryName(entries, tgt))) } } }
                         else if mi == 1 { if tgt >= 0 && entryName(entries, tgt) != ".." { clipboard = joinDir(cwd, entryName(entries, tgt))  clipOp = "cut" } }
                         else if mi == 2 { if tgt >= 0 && entryName(entries, tgt) != ".." { clipboard = joinDir(cwd, entryName(entries, tgt))  clipOp = "copy" } }
-                        else if mi == 3 { if clipboard != "" { if clipOp == "cut" { exec("mv --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null")  clipboard = ""  clipOp = "" } else { exec("cp -r --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null") }  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries } }
+                        else if mi == 3 { if clipboard != "" { pasteClip(cwd, clipboard, clipOp)  if clipOp == "cut" { clipboard = ""  clipOp = "" }  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries } }
                         else if mi == 4 { if tgt >= 0 && entryName(entries, tgt) != ".." { sel = tgt  renaming = 1  renameText = entryName(entries, tgt) } }
                         else if mi == 5 { if tgt >= 0 && entryName(entries, tgt) != ".." { trashItem(joinDir(cwd, entryName(entries, tgt)))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } }
                         else if mi == 6 { newFolder(cwd)  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  let nf = rowOfName(entries, "New Folder")  if nf >= 0 { sel = nf  renaming = 1  renameText = "" } }
@@ -1075,12 +1100,12 @@ just run {
                     else if kc == 70 { openTerminal(cwd) }                       // F4 terminal here
                     else if kc == 68 { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { renaming = 1  renameText = entryName(entries, sel) }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // F2 rename
                     else if kc == 119 { if marked != "" { trashMarked(cwd, marked)  marked = ""  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } else { if sel >= 0 && sel < countLines(entries) && entryName(entries, sel) != ".." { trashItem(joinDir(cwd, entryName(entries, sel)))  allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries  if sel >= countLines(entries) { sel = countLines(entries) - 1 } } }  repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked) }  // Delete -> trash
-                    else if kc == 54 && ctrl == 1 && shift == 0 { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } }  // Ctrl+C
-                    else if kc == 53 && ctrl == 1 && shift == 0 { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "cut" } }   // Ctrl+X
+                    else if kc == 54 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked)  clipOp = "copy" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "copy" } } }  // Ctrl+C
+                    else if kc == 53 && ctrl == 1 && shift == 0 { if marked != "" { clipboard = clipFromMarked(cwd, marked)  clipOp = "cut" } else { if sel >= 0 && entryName(entries, sel) != ".." { clipboard = joinDir(cwd, entryName(entries, sel))  clipOp = "cut" } } }   // Ctrl+X
                     else if kc == 55 && ctrl == 1 {                                                                            // Ctrl+V paste
                         if clipboard != "" {
-                            if clipOp == "cut" { exec("mv --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null")  clipboard = ""  clipOp = "" }
-                            else { exec("cp -r --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null") }
+                            pasteClip(cwd, clipboard, clipOp)
+                            if clipOp == "cut" { clipboard = ""  clipOp = "" }
                             allEntries = buildEntries(cwd, showHidden, sortMode)  entries = allEntries
                         }
                         repaint(fd, info, cwd, entries, sel, places, curW, curH, folderSml, folderBig, fileBig, scratch, haveIcons, addr, addrFocused, backRaw, fwdRaw, reloadRaw, dark, driveSml, scroll, renaming, renameText, menuOpen, menuX, menuY, helpOpen, searchMode, searchText, marked)
