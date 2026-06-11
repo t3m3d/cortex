@@ -320,6 +320,7 @@ just run {
     let mediaBig   = loadIcon("med", mediaSvg(), big)
     let nextId = 12
     let prevBuf = 0  let prevPool = 0  let prevMfd = 0
+    let mouseX = 0  let mouseY = 0
 
     let running = 1
     while running == 1 {
@@ -365,6 +366,37 @@ just run {
                         if srow >= scroll + vis { scroll = srow - vis + 1 }
                         dirty = 1
                     }
+                }
+                if obj == PTR && op == 0 { mouseX = wlFixed(eb, off + 16)  mouseY = wlFixed(eb, off + 20) }
+                if obj == PTR && op == 2 { mouseX = wlFixed(eb, off + 12)  mouseY = wlFixed(eb, off + 16) }
+                if obj == PTR && op == 3 {
+                    if wlU32(eb, off + 16) == 272 && wlU32(eb, off + 20) == 1 {
+                        if mouseX >= SIDEW() && mouseY >= HDRH() {
+                            let cols = gridCols(W)
+                            let ccol = (mouseX - SIDEW() - PAD()) / CELLW()
+                            let crow = (mouseY - HDRH() - PAD()) / CELLH() + scroll
+                            let idx = crow * cols + ccol
+                            if ccol >= 0 && ccol < cols && idx >= 0 && idx < countLines(ent) {
+                                if idx == sel && entIsDir(ent, idx) {
+                                    let nm = entName(ent, idx)
+                                    if nm == ".." { cwd = parentDir(cwd) } else { cwd = joinDir(cwd, nm) }
+                                    ent = buildEntries(cwd)  sel = 0  scroll = 0
+                                    wlSetTitle(fd, TOP, "cortex - " + basename(cwd))
+                                } else { sel = idx }
+                            }
+                            dirty = 1
+                        }
+                    }
+                }
+                if obj == PTR && op == 4 {
+                    if wlU32(eb, off + 16) > 2000000000 { if scroll > 0 { scroll -= 1 } }
+                    else { scroll += 1 }
+                    let cc = gridCols(W)
+                    let trows = (countLines(ent) + cc - 1) / cc
+                    let visr = (H - HDRH() - PAD() - 10) / CELLH()
+                    if scroll > trows - visr { scroll = trows - visr }
+                    if scroll < 0 { scroll = 0 }
+                    dirty = 1
                 }
                 off = off + s
             }
