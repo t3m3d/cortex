@@ -90,38 +90,59 @@ func buildEntries(cwd, showHidden, sortMode) {
     emit "d ..\n" + dirs + files
 }
 // quick-access places: "label<TAB>path" lines, standard dirs that exist.
-func _place(label, path) {
-    if chomp(exec("test -d '" + path + "' && echo 1")) == "1" { emit label + fromCharCode(9) + path + "\n" }
+func _place(label, path, kind) {
+    if chomp(exec("test -d '" + path + "' && echo 1")) == "1" { emit label + fromCharCode(9) + path + fromCharCode(9) + kind + "\n" }
     emit ""
 }
 func bookmarksPath() { emit homeDir() + "/.config/cortex/bookmarks" }
 func buildPlaces() {
     let home = homeDir()
-    let out = "Home" + fromCharCode(9) + home + "\n"
-    out = out + _place("Desktop", home + "/Desktop")
-    out = out + _place("Documents", home + "/Documents")
-    out = out + _place("Downloads", home + "/Downloads")
-    out = out + _place("Pictures", home + "/Pictures")
-    out = out + _place("Music", home + "/Music")
-    out = out + _place("Videos", home + "/Videos")
-    out = out + "Filesystem" + fromCharCode(9) + "/\n"
+    let out = "Home" + fromCharCode(9) + home + fromCharCode(9) + "home\n"
+    out = out + _place("Desktop", home + "/Desktop", "desk")
+    out = out + _place("Documents", home + "/Documents", "doc")
+    out = out + _place("Downloads", home + "/Downloads", "dl")
+    out = out + _place("Pictures", home + "/Pictures", "pic")
+    out = out + _place("Music", home + "/Music", "music")
+    out = out + _place("Videos", home + "/Videos", "vid")
+    out = out + "Filesystem" + fromCharCode(9) + "/" + fromCharCode(9) + "fs\n"
     // user bookmarks (one path per line)
     let bm = exec("cat '" + bookmarksPath() + "' 2>/dev/null")
     let bn = countLines(bm)
     let bi = 0
     while bi < bn {
         let bp = nthLine(bm, bi)
-        if bp != "" { out = out + basename(bp) + fromCharCode(9) + bp + "\n" }
+        if bp != "" { out = out + basename(bp) + fromCharCode(9) + bp + fromCharCode(9) + "folder\n" }
         bi += 1
     }
-    // mounted removable drives -> label \t mountpoint
-    let dv = exec("lsblk -Pno LABEL,MOUNTPOINT,RM,TYPE,FSTYPE 2>/dev/null | while read l; do eval \"$l\"; if [ \"$TYPE\" = part ] && [ \"$RM\" = 1 ] && [ -n \"$MOUNTPOINT\" ]; then printf '%s\\t%s\\n' \"${LABEL:-drive}\" \"$MOUNTPOINT\"; fi; done")
+    // external/removable drives (USB/hotplug or mounted under media dirs).
+    // Includes drives that are present-but-UNMOUNTED so they still appear in
+    // the sidebar; a 4th tab field carries the device node (/dev/sdX) so a
+    // click can mount it on demand. Fields: label<TAB>mountpoint<TAB>drive<TAB>dev
+    let dv = exec("lsblk -Pno LABEL,MOUNTPOINT,RM,HOTPLUG,TYPE,FSTYPE,NAME 2>/dev/null | while read l; do eval \"$l\"; case \"$MOUNTPOINT\" in /run/media/*|/media/*|/mnt/*) m=1;; *) m=0;; esac; if [ \"$TYPE\" = part ] && [ -n \"$FSTYPE\" ] && { [ \"$RM\" = 1 ] || [ \"$HOTPLUG\" = 1 ] || [ \"$m\" = 1 ]; }; then printf '%s\\t%s\\tdrive\\t/dev/%s\\n' \"${LABEL:-$NAME}\" \"$MOUNTPOINT\" \"$NAME\"; fi; done")
     out = out + dv
     if len(dv) > 0 && dv[len(dv) - 1] != fromCharCode(10) { out = out + "\n" }
+    // network shares: nfs/cifs/sshfs/etc from /proc/mounts, plus gvfs mounts
+    let nw = exec("awk '$3==\"nfs\"||$3==\"nfs4\"||$3==\"cifs\"||$3==\"smb3\"||$3==\"fuse.sshfs\"||$3==\"afpfs\"||$3==\"ceph\"{print $2}' /proc/mounts 2>/dev/null | while read mp; do printf '%s\\t%s\\tnetwork\\n' \"$(basename \"$mp\")\" \"$mp\"; done; gd=\"/run/user/$(id -u)/gvfs\"; if [ -d \"$gd\" ]; then for s in \"$gd\"/*; do [ -e \"$s\" ] && printf '%s\\t%s\\tnetwork\\n' \"$(basename \"$s\")\" \"$s\"; done; fi")
+    out = out + nw
+    if len(nw) > 0 && nw[len(nw) - 1] != fromCharCode(10) { out = out + "\n" }
     emit out
 }
-func plLabel(s) { let t = indexOf(s, fromCharCode(9))  emit substring(s, 0, t) }
-func plPath(s)  { let t = indexOf(s, fromCharCode(9))  emit substring(s, t + 1, len(s)) }
+func _fld(s, n) {   // n-th tab-delimited field (0-based)
+    let cur = s
+    let k = 0
+    while k < n {
+        let t = indexOf(cur, fromCharCode(9))
+        if t < 0 { emit "" }
+        cur = substring(cur, t + 1, len(cur))
+        k += 1
+    }
+    let t = indexOf(cur, fromCharCode(9))
+    if t < 0 { emit cur }
+    emit substring(cur, 0, t)
+}
+func plLabel(s) { emit _fld(s, 0) }
+func plPath(s)  { emit _fld(s, 1) }
+func plKind(s)  { let k = _fld(s, 2)  if k == "" { emit "folder" }  emit k }
 func PLY()      { emit HDRH() + 36 }   // first place row y
 func menuItems() { emit "Open\nCut\nCopy\nPaste\nRename\nMove to Trash\nNew Folder\nOpen Terminal" }
 func entIsDir(e, r) { emit nthLine(e, r)[0] == "d" }
@@ -496,15 +517,23 @@ func driveSvg() {
          "<rect x='11' y='21' width='13' height='2.4' rx='1.2' fill='#1FA463'/>" +
          "<circle cx='34' cy='24' r='2.6' fill='#34C77E'/></svg>"
 }
-func placeIconFor(label, fb, home, drive, doc, dl, mus, pic, vid, desk) {
-    if label == "Home" { emit home }
-    if label == "Filesystem" { emit drive }
-    if label == "Documents" { emit doc }
-    if label == "Downloads" { emit dl }
-    if label == "Music" { emit mus }
-    if label == "Pictures" { emit pic }
-    if label == "Videos" { emit vid }
-    if label == "Desktop" { emit desk }
+func networkSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<circle cx='24' cy='24' r='15' fill='none' stroke='#34C77E' stroke-width='2'/>" +
+         "<ellipse cx='24' cy='24' rx='6.5' ry='15' fill='none' stroke='#1FA463' stroke-width='1.6'/>" +
+         "<path d='M9.5 19 h29 M9.5 29 h29 M24 9 v30' stroke='#1FA463' stroke-width='1.6'/></svg>"
+}
+func placeIconFor(kind, fb, home, drive, doc, dl, mus, pic, vid, desk, net) {
+    if kind == "home" { emit home }
+    if kind == "fs" { emit drive }
+    if kind == "drive" { emit drive }
+    if kind == "network" { emit net }
+    if kind == "doc" { emit doc }
+    if kind == "dl" { emit dl }
+    if kind == "music" { emit mus }
+    if kind == "pic" { emit pic }
+    if kind == "vid" { emit vid }
+    if kind == "desk" { emit desk }
     emit fb
 }
 func folderIconFor(name, fb, doc, dl, mus, pic, vid, desk) {
@@ -531,7 +560,7 @@ func fileIconFor(name, fb, img, arc, med) {
 func IBIG() { emit 64 }
 
 // ── render ──────────────────────────────────────────────────────────────────
-func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml) {
+func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml, netSml) {
     fbClear(px, W, H, cBg())
     fbFillRect(px, W, 0, HDRH(), SIDEW(), H - HDRH(), cSide())
     fbFillRect(px, W, SIDEW() - 1, HDRH(), 1, H - HDRH(), cLine())
@@ -542,7 +571,7 @@ func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlB
         let line = nthLine(places, p)
         let py = PLY() + p * 30
         if plPath(line) == cwd { fbRoundRect(px, W, H, 6, py - 4, SIDEW() - 12, 28, 8, cSel()) }
-        fbBlitAlpha(px, W, H, 14, py - 4, placeIconFor(plLabel(line), folderSml, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml), 24, 24)
+        fbBlitAlpha(px, W, H, 14, py - 4, placeIconFor(plKind(line), folderSml, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml, netSml), 24, 24)
         fbDrawText(px, W, H, font, 44, py + 8, plLabel(line), cText())
         p += 1
     }
@@ -668,6 +697,7 @@ just run {
     let flSml      = loadIcon("filesml", fileSvg(), 24)
     let homeSml    = loadIcon("homesml", homeSvg(), 24)
     let driveSml   = loadIcon("drivesml", driveSvg(), 24)
+    let netSml     = loadIcon("netsml", networkSvg(), 24)
     let docSml     = loadIcon("docsml", docFolderSvg(), 24)
     let dlSml      = loadIcon("dlsml", dlFolderSvg(), 24)
     let musSml     = loadIcon("mussml", musicFolderSvg(), 24)
@@ -806,8 +836,16 @@ just run {
                         if mouseX < SIDEW() && mouseY >= PLY() - 4 {
                             let prow = (mouseY - PLY() + 4) / 30
                             if prow >= 0 && prow < countLines(places) {
-                                let tgt = plPath(nthLine(places, prow))
-                                if tgt != cwd { cwd = tgt  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  marked = ""  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }
+                                let pl = nthLine(places, prow)
+                                let tgt = plPath(pl)
+                                let dev = _fld(pl, 3)
+                                // unmounted removable drive: mount it on click, then enter it
+                                if tgt == "" && dev != "" {
+                                    shellRun("udisksctl mount -b '" + dev + "' >/dev/null 2>&1")
+                                    tgt = chomp(exec("lsblk -no MOUNTPOINT '" + dev + "' 2>/dev/null | head -1"))
+                                    places = buildPlaces()
+                                }
+                                if tgt != "" && tgt != cwd { cwd = tgt  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  marked = ""  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }
                             }
                             dirty = 1
                         }
@@ -867,7 +905,7 @@ just run {
             let sz = stride * H
             let m = memfdCreate(sz)
             let px = mmapShared(m, sz)
-            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml)
+            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml, netSml)
             wlCreatePool(fd, SHM, pool, m, sz)
             wlPoolCreateBuffer(fd, pool, buf, 0, W, H, stride, 1)
             wlSurfaceAttach(fd, SURF, buf, 0, 0)
