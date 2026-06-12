@@ -93,6 +93,7 @@ func _place(label, path) {
     if chomp(exec("test -d '" + path + "' && echo 1")) == "1" { emit label + fromCharCode(9) + path + "\n" }
     emit ""
 }
+func bookmarksPath() { emit homeDir() + "/.config/cortex/bookmarks" }
 func buildPlaces() {
     let home = homeDir()
     let out = "Home" + fromCharCode(9) + home + "\n"
@@ -103,6 +104,19 @@ func buildPlaces() {
     out = out + _place("Music", home + "/Music")
     out = out + _place("Videos", home + "/Videos")
     out = out + "Filesystem" + fromCharCode(9) + "/\n"
+    // user bookmarks (one path per line)
+    let bm = exec("cat '" + bookmarksPath() + "' 2>/dev/null")
+    let bn = countLines(bm)
+    let bi = 0
+    while bi < bn {
+        let bp = nthLine(bm, bi)
+        if bp != "" { out = out + basename(bp) + fromCharCode(9) + bp + "\n" }
+        bi += 1
+    }
+    // mounted removable drives -> label \t mountpoint
+    let dv = exec("lsblk -Pno LABEL,MOUNTPOINT,RM,TYPE,FSTYPE 2>/dev/null | while read l; do eval \"$l\"; if [ \"$TYPE\" = part ] && [ \"$RM\" = 1 ] && [ -n \"$MOUNTPOINT\" ]; then printf '%s\\t%s\\n' \"${LABEL:-drive}\" \"$MOUNTPOINT\"; fi; done")
+    out = out + dv
+    if len(dv) > 0 && dv[len(dv) - 1] != fromCharCode(10) { out = out + "\n" }
     emit out
 }
 func plLabel(s) { let t = indexOf(s, fromCharCode(9))  emit substring(s, 0, t) }
@@ -613,6 +627,8 @@ just run {
                         if kc == 65 && ctrlDown == 0 { if entName(ent, sel) != ".." { marked = markToggle(marked, entName(ent, sel)) } }  // Space mark
                         if kc == 38 && ctrlDown == 1 && shiftDown == 0 { marked = markAll(ent) }  // Ctrl+A select all
                         if kc == 38 && ctrlDown == 1 && shiftDown == 1 { marked = "" }  // Ctrl+Shift+A clear
+                        if kc == 40 && ctrlDown == 1 && shiftDown == 0 { shellRun("mkdir -p \"$(dirname '" + bookmarksPath() + "')\"; grep -qxF '" + cwd + "' '" + bookmarksPath() + "' 2>/dev/null || echo '" + cwd + "' >> '" + bookmarksPath() + "'")  places = buildPlaces() }  // Ctrl+D bookmark
+                        if kc == 40 && ctrlDown == 1 && shiftDown == 1 { shellRun("grep -vxF '" + cwd + "' '" + bookmarksPath() + "' > '" + bookmarksPath() + ".tmp' 2>/dev/null && mv '" + bookmarksPath() + ".tmp' '" + bookmarksPath() + "'")  places = buildPlaces() }  // Ctrl+Shift+D unbookmark
                         // keep selection visible
                         let vis = (H - HDRH() - PAD() - 10) / rowHFor(viewMode)
                         let srow = sel / cols
