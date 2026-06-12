@@ -233,6 +233,10 @@ func CELLW() { emit 150 }
 func CELLH() { emit 116 }
 func PAD()   { emit 18 }
 func gridCols(w) { let c = (w - SIDEW() - PAD() * 2) / CELLW()  if c < 1 { emit 1 }  emit c }
+func LISTROWH()  { emit 34 }
+func colsFor(w, vm)  { if vm == 1 { emit 1 }  emit gridCols(w) }
+func rowHFor(vm)     { if vm == 1 { emit LISTROWH() }  emit CELLH() }
+func cellWFor(w, vm) { if vm == 1 { emit w - SIDEW() - PAD() * 2 }  emit CELLW() }
 
 // ── drawn icons (fb primitives) ─────────────────────────────────────────────
 // green folder ~ 56x44 at (x,y)
@@ -369,7 +373,7 @@ func fileIconFor(name, fb, img, arc, med) {
 func IBIG() { emit 64 }
 
 // ── render ──────────────────────────────────────────────────────────────────
-func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked) {
+func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml) {
     fbClear(px, W, H, cBg())
     fbFillRect(px, W, 0, HDRH(), SIDEW(), H - HDRH(), cSide())
     fbDrawText(px, W, H, font, 16, HDRH() + 16, "Quick access", cMuted())
@@ -392,26 +396,36 @@ func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlB
     fbDrawText(px, W, H, font, 90, 20, "o", cGreenB())
     fbRoundRect(px, W, H, 124, 8, W - 124 - 16, 32, 8, cSide())
     fbDrawText(px, W, H, font, 136, 18, cwd, cText())
-    let cols = gridCols(W)
+    let cols = colsFor(W, viewMode)
     let n = countLines(ent)
     let i = 0
     while i < n {
         let col = i - i / cols * cols
         let row = i / cols
         if row >= scroll {
-            let cx = SIDEW() + PAD() + col * CELLW()
-            let cy = HDRH() + PAD() + (row - scroll) * CELLH()
+            let cellW = cellWFor(W, viewMode)
+            let rowH = rowHFor(viewMode)
+            let cx = SIDEW() + PAD() + col * cellW
+            let cy = HDRH() + PAD() + (row - scroll) * rowH
             if cy < H - 10 {
                 let nm = entName(ent, i)
-                if i == sel || markHas(marked, nm) == 1 { fbRoundRect(px, W, H, cx - 6, cy - 6, CELLW() - 16, CELLH() - 12, 10, cSel()) }
                 let ic = fileIconFor(nm, fileBig, imageBig, archiveBig, mediaBig)
                 if entIsDir(ent, i) { ic = folderIconFor(nm, folderBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig) }
-                fbBlitAlpha(px, W, H, cx + (CELLW() - 28 - IBIG()) / 2, cy + 2, ic, IBIG(), IBIG())
-                let maxc = (CELLW() - 24) / 8
-                let lbl = nm
-                if len(lbl) > maxc { lbl = substring(lbl, 0, maxc) }
-                let lx = cx + (CELLW() - 28 - len(lbl) * 8) / 2
-                fbDrawText(px, W, H, font, lx, cy + 66, lbl, cText())
+                if viewMode == 1 {
+                    if i == sel || markHas(marked, nm) == 1 { fbRoundRect(px, W, H, cx - 6, cy - 4, cellW - 8, rowH - 4, 8, cSel()) }
+                    let slIc = folderSml
+                    if entIsDir(ent, i) == 0 { slIc = flSml }
+                    fbBlitAlpha(px, W, H, cx, cy + (rowH - 24) / 2, slIc, 24, 24)
+                    fbDrawText(px, W, H, font, cx + 34, cy + rowH / 2 + 4, nm, cText())
+                } else {
+                    if i == sel || markHas(marked, nm) == 1 { fbRoundRect(px, W, H, cx - 6, cy - 6, cellW - 16, CELLH() - 12, 10, cSel()) }
+                    fbBlitAlpha(px, W, H, cx + (cellW - 28 - IBIG()) / 2, cy + 2, ic, IBIG(), IBIG())
+                    let maxc = (cellW - 24) / 8
+                    let lbl = nm
+                    if len(lbl) > maxc { lbl = substring(lbl, 0, maxc) }
+                    let lx = cx + (cellW - 28 - len(lbl) * 8) / 2
+                    fbDrawText(px, W, H, font, lx, cy + 66, lbl, cText())
+                }
             }
         }
         i += 1
@@ -447,7 +461,7 @@ just run {
 
     let W = 900  let H = 600
     let cwd = chomp(exec("printf %s \"$HOME\""))
-    let showHidden = 0  let sortMode = 0
+    let showHidden = 0  let sortMode = 0  let viewMode = 0
     let ent = buildEntries(cwd, showHidden, sortMode)
     let sel = 0  let scroll = 0
     let font = wlFontLoad()
@@ -464,6 +478,7 @@ just run {
     let archiveBig = loadIcon("arc", archiveSvg(), big)
     let mediaBig   = loadIcon("med", mediaSvg(), big)
     let folderSml  = loadIcon("foldersml", folderSvg(), 24)
+    let flSml      = loadIcon("filesml", fileSvg(), 24)
     let places     = buildPlaces()
     let nextId = 12
     let prevBuf = 0  let prevPool = 0  let prevMfd = 0
@@ -503,7 +518,7 @@ just run {
                             else { let ch2 = keyChar(kmap, kc, shiftDown)  if ch2 != "" { textBuf = textBuf + ch2  if mode == 2 { ent = filterEntries(allEnt, textBuf)  sel = 0 } } } } }
                         }
                         if mode == 0 {
-                        let cols = gridCols(W)
+                        let cols = colsFor(W, viewMode)
                         if kc == 114 { if sel + 1 < countLines(ent) { sel += 1 } }          // Right
                         if kc == 113 { if sel > 0 { sel -= 1 } }                            // Left
                         if kc == 116 { if sel + cols < countLines(ent) { sel += cols } }    // Down
@@ -530,6 +545,7 @@ just run {
                         if kc == 57 && ctrlDown == 1 && shiftDown == 0 { shellRun("touch '" + cwd + "/New File'")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt }  // Ctrl+N new file
                         if kc == 68 { if entName(ent, sel) != ".." { mode = 1  textBuf = entName(ent, sel) } }   // F2 rename
                         if kc == 41 && ctrlDown == 1 { mode = 2  textBuf = "" }              // Ctrl+F search
+                        if kc == 23 { viewMode = 1 - viewMode  scroll = 0 }                  // Tab toggle view
                         if kc == 39 && ctrlDown == 1 { sortMode = sortMode + 1  if sortMode > 2 { sortMode = 0 }  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0 }  // Ctrl+S sort
                         if kc == 27 && ctrlDown == 1 && shiftDown == 1 { if entName(ent, sel) != ".." { shellRun("cd '" + cwd + "' && cp -r --backup=numbered '" + entName(ent, sel) + "' '" + entName(ent, sel) + ".copy' 2>/dev/null")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt } }  // Ctrl+Shift+R duplicate
                         if kc == 52 && ctrlDown == 1 && shiftDown == 1 { if entName(ent, sel) != ".." { shellRun("cd '" + cwd + "' && (zip -r -q '" + entName(ent, sel) + ".zip' '" + entName(ent, sel) + "' 2>/dev/null || tar czf '" + entName(ent, sel) + ".tar.gz' '" + entName(ent, sel) + "' 2>/dev/null)")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt } }  // Ctrl+Shift+Z compress
@@ -540,7 +556,7 @@ just run {
                         if kc == 38 && ctrlDown == 1 && shiftDown == 0 { marked = markAll(ent) }  // Ctrl+A select all
                         if kc == 38 && ctrlDown == 1 && shiftDown == 1 { marked = "" }  // Ctrl+Shift+A clear
                         // keep selection visible
-                        let vis = (H - HDRH() - PAD() - 10) / CELLH()
+                        let vis = (H - HDRH() - PAD() - 10) / rowHFor(viewMode)
                         let srow = sel / cols
                         if srow < scroll { scroll = srow }
                         if srow >= scroll + vis { scroll = srow - vis + 1 }
@@ -573,9 +589,9 @@ just run {
                             dirty = 1
                         }
                         if mouseX >= SIDEW() && mouseY >= HDRH() {
-                            let cols = gridCols(W)
-                            let ccol = (mouseX - SIDEW() - PAD()) / CELLW()
-                            let crow = (mouseY - HDRH() - PAD()) / CELLH() + scroll
+                            let cols = colsFor(W, viewMode)
+                            let ccol = (mouseX - SIDEW() - PAD()) / cellWFor(W, viewMode)
+                            let crow = (mouseY - HDRH() - PAD()) / rowHFor(viewMode) + scroll
                             let idx = crow * cols + ccol
                             if ccol >= 0 && ccol < cols && idx >= 0 && idx < countLines(ent) {
                                 if idx == sel && entIsDir(ent, idx) {
@@ -592,9 +608,9 @@ just run {
                 if obj == PTR && op == 4 {
                     if wlU32(eb, off + 16) > 2000000000 { if scroll > 0 { scroll -= 1 } }
                     else { scroll += 1 }
-                    let cc = gridCols(W)
+                    let cc = colsFor(W, viewMode)
                     let trows = (countLines(ent) + cc - 1) / cc
-                    let visr = (H - HDRH() - PAD() - 10) / CELLH()
+                    let visr = (H - HDRH() - PAD() - 10) / rowHFor(viewMode)
                     if scroll > trows - visr { scroll = trows - visr }
                     if scroll < 0 { scroll = 0 }
                     dirty = 1
@@ -614,7 +630,7 @@ just run {
             let sz = stride * H
             let m = memfdCreate(sz)
             let px = mmapShared(m, sz)
-            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked)
+            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml)
             wlCreatePool(fd, SHM, pool, m, sz)
             wlPoolCreateBuffer(fd, pool, buf, 0, W, H, stride, 1)
             wlSurfaceAttach(fd, SURF, buf, 0, 0)
