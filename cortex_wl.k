@@ -13,6 +13,7 @@ func cMuted() { emit 8949625 }   // #889099
 func cSel()   { emit 1985612 }   // #1e484c-ish soft green
 func cGreenA(){ emit 2073699 }   // #1FA463
 func cGreenB(){ emit 3722372 }   // #38CE84
+func cLine()  { emit 1184275 }   // #121213 subtle pane divider
 
 func chomp(s) {
     let p = s
@@ -307,6 +308,12 @@ func CELLH() { emit 116 }
 func PAD()   { emit 18 }
 func gridCols(w) { let c = (w - SIDEW() - PAD() * 2) / CELLW()  if c < 1 { emit 1 }  emit c }
 func LISTROWH()  { emit 34 }
+// header right-side control centers (search / view / menu / close)
+func hSearchX(w) { emit w - 138 }
+func hViewX(w)   { emit w - 102 }
+func hMenuX(w)   { emit w - 66 }
+func hCloseX(w)  { emit w - 30 }
+func hHit(cx, ex) { if ex >= cx - 15 && ex < cx + 15 { emit 1 }  emit 0 }
 func colsFor(w, vm)  { if vm == 1 { emit 1 }  emit gridCols(w) }
 func rowHFor(vm)     { if vm == 1 { emit LISTROWH() }  emit CELLH() }
 func cellWFor(w, vm) { if vm == 1 { emit w - SIDEW() - PAD() * 2 }  emit CELLW() }
@@ -323,6 +330,62 @@ func drawFile(px, W, H, x, y) {
     fbRoundRect(px, W, H, x, y, 40, 48, 4, cText())
     fbFillRect(px, W, x + 8, y + 14, 24, 3, cGreenA())
     fbFillRect(px, W, x + 8, y + 22, 18, 3, cMuted())
+}
+
+// ── header glyphs (drawn from primitives — no proportional font) ─────────────
+// chevron: tip at (x,y). dir 0 = "<" (tip left), dir 1 = ">" (tip right). h~12.
+func drawChevron(px, W, x, y, dir, col) {
+    let k = 0
+    while k <= 6 {
+        let dx = 6 - k
+        if dir == 1 { dx = k }
+        fbFillRect(px, W, x + dx, y - 6 + k, 2, 2, col)
+        fbFillRect(px, W, x + dx, y + 6 - k, 2, 2, col)
+        k += 1
+    }
+}
+// reload: ring with a small break + arrow notch
+func drawReload(px, W, H, cx, cy, col, bg) {
+    fbFillCircle(px, W, H, cx, cy, 7, col)
+    fbFillCircle(px, W, H, cx, cy, 4, bg)
+    fbFillRect(px, W, cx + 3, cy - 9, 6, 6, bg)
+    fbFillRect(px, W, cx + 4, cy - 8, 5, 3, col)
+    fbFillRect(px, W, cx + 7, cy - 9, 3, 5, col)
+}
+// magnifier: ring + diagonal handle
+func drawSearchIcon(px, W, H, cx, cy, col, bg) {
+    fbFillCircle(px, W, H, cx, cy, 6, col)
+    fbFillCircle(px, W, H, cx, cy, 3, bg)
+    let k = 0
+    while k < 5 { fbFillRect(px, W, cx + 4 + k, cy + 4 + k, 2, 2, col)  k += 1 }
+}
+// hamburger: three stacked bars, top-left at (x,y)
+func drawHamburger(px, W, x, y, col) {
+    fbFillRect(px, W, x, y, 16, 2, col)
+    fbFillRect(px, W, x, y + 5, 16, 2, col)
+    fbFillRect(px, W, x, y + 10, 16, 2, col)
+}
+// 2x2 grid glyph (view switcher), top-left at (x,y)
+func drawViewIcon(px, W, x, y, col) {
+    fbFillRect(px, W, x, y, 6, 6, col)
+    fbFillRect(px, W, x + 9, y, 6, 6, col)
+    fbFillRect(px, W, x, y + 9, 6, 6, col)
+    fbFillRect(px, W, x + 9, y + 9, 6, 6, col)
+}
+// 3-row list glyph (view switcher, list mode)
+func drawListIcon(px, W, x, y, col) {
+    fbFillRect(px, W, x, y, 3, 3, col)       fbFillRect(px, W, x + 5, y + 1, 10, 2, col)
+    fbFillRect(px, W, x, y + 6, 3, 3, col)   fbFillRect(px, W, x + 5, y + 7, 10, 2, col)
+    fbFillRect(px, W, x, y + 12, 3, 3, col)  fbFillRect(px, W, x + 5, y + 13, 10, 2, col)
+}
+// close "×" centered at (cx,cy)
+func drawClose(px, W, cx, cy, col) {
+    let k = 0
+    while k < 10 {
+        fbFillRect(px, W, cx - 5 + k, cy - 5 + k, 2, 2, col)
+        fbFillRect(px, W, cx + 4 - k, cy - 5 + k, 2, 2, col)
+        k += 1
+    }
 }
 
 
@@ -348,7 +411,7 @@ func rasterHex(name, svg, sz) {
     let svgf = dir + "/" + name + ".svg"
     let hexf = dir + "/" + name + "-" + sz + ".hex"
     writeFile(svgf, svg)
-    shellRun("convert -background none -density " + (sz * 4) + " '" + svgf + "' -resize " + sz + "x" + sz + " -depth 8 BGRA:- 2>/dev/null | xxd -p -c 0 > '" + hexf + "'")
+    shellRun("magick -background none -density " + (sz * 4) + " '" + svgf + "' -resize " + sz + "x" + sz + " -depth 8 BGRA:- 2>/dev/null | od -An -v -tx1 | tr -dc '0-9a-f' > '" + hexf + "'")
     emit chomp(readFile(hexf))
 }
 func lc1(c) { if c >= "A" && c <= "Z" { emit fromCharCode(charCode(c) + 32) }  emit c }
@@ -422,6 +485,28 @@ func mediaSvg() {
          "<rect x='8' y='9' width='32' height='30' rx='4' fill='#FFFFFF' stroke='#D2D5DE' stroke-width='1.5'/>" +
          "<path d='M20 17.5 l12 6.5 -12 6.5 z' fill='#1FA463'/></svg>"
 }
+func homeSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<path d='M24 7 L6 23 h4 v15 a2 2 0 0 0 2 2 h24 a2 2 0 0 0 2-2 V23 h4 z' fill='#34C77E' stroke='#1E9E5E' stroke-width='1.2' stroke-linejoin='round'/>" +
+         "<rect x='20' y='29' width='8' height='11' rx='1' fill='#13794A'/></svg>"
+}
+func driveSvg() {
+    emit "<svg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'>" +
+         "<rect x='7' y='16' width='34' height='16' rx='3' fill='#E7EFEA' stroke='#1E9E5E' stroke-width='1.3'/>" +
+         "<rect x='11' y='21' width='13' height='2.4' rx='1.2' fill='#1FA463'/>" +
+         "<circle cx='34' cy='24' r='2.6' fill='#34C77E'/></svg>"
+}
+func placeIconFor(label, fb, home, drive, doc, dl, mus, pic, vid, desk) {
+    if label == "Home" { emit home }
+    if label == "Filesystem" { emit drive }
+    if label == "Documents" { emit doc }
+    if label == "Downloads" { emit dl }
+    if label == "Music" { emit mus }
+    if label == "Pictures" { emit pic }
+    if label == "Videos" { emit vid }
+    if label == "Desktop" { emit desk }
+    emit fb
+}
 func folderIconFor(name, fb, doc, dl, mus, pic, vid, desk) {
     if name == "Documents" { emit doc }
     if name == "Downloads" { emit dl }
@@ -446,9 +531,10 @@ func fileIconFor(name, fb, img, arc, med) {
 func IBIG() { emit 64 }
 
 // ── render ──────────────────────────────────────────────────────────────────
-func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY) {
+func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml) {
     fbClear(px, W, H, cBg())
     fbFillRect(px, W, 0, HDRH(), SIDEW(), H - HDRH(), cSide())
+    fbFillRect(px, W, SIDEW() - 1, HDRH(), 1, H - HDRH(), cLine())
     fbDrawText(px, W, H, font, 16, HDRH() + 16, "Quick access", cMuted())
     let np = countLines(places)
     let p = 0
@@ -456,19 +542,25 @@ func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlB
         let line = nthLine(places, p)
         let py = PLY() + p * 30
         if plPath(line) == cwd { fbRoundRect(px, W, H, 6, py - 4, SIDEW() - 12, 28, 8, cSel()) }
-        fbBlitAlpha(px, W, H, 14, py - 4, folderSml, 24, 24)
+        fbBlitAlpha(px, W, H, 14, py - 4, placeIconFor(plLabel(line), folderSml, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml), 24, 24)
         fbDrawText(px, W, H, font, 44, py + 8, plLabel(line), cText())
         p += 1
     }
     fbFillRect(px, W, 0, 0, W, HDRH(), cHdr())
+    fbFillRect(px, W, 0, HDRH() - 1, W, 1, cLine())
     fbFillCircle(px, W, H, 24, 24, 15, cSide())
     fbFillCircle(px, W, H, 60, 24, 15, cSide())
     fbFillCircle(px, W, H, 96, 24, 15, cSide())
-    fbDrawText(px, W, H, font, 18, 20, "<", cGreenB())
-    fbDrawText(px, W, H, font, 54, 20, ">", cGreenB())
-    fbDrawText(px, W, H, font, 90, 20, "o", cGreenB())
-    fbRoundRect(px, W, H, 124, 8, W - 124 - 16, 32, 8, cSide())
-    drawCrumbs(px, W, H, font, 136, 18, W - 136 - 16, cwd)
+    drawChevron(px, W, 21, 24, 0, cGreenB())
+    drawChevron(px, W, 57, 24, 1, cGreenB())
+    drawReload(px, W, H, 96, 24, cGreenB(), cSide())
+    fbRoundRect(px, W, H, 124, 8, W - 124 - 160, 32, 8, cSide())
+    drawCrumbs(px, W, H, font, 136, 18, W - 136 - 168, cwd)
+    drawSearchIcon(px, W, H, hSearchX(W), 24, cMuted(), cHdr())
+    if viewMode == 1 { drawListIcon(px, W, hViewX(W) - 7, 16, cMuted()) }
+    else { drawViewIcon(px, W, hViewX(W) - 7, 16, cMuted()) }
+    drawHamburger(px, W, hMenuX(W) - 8, 18, cMuted())
+    drawClose(px, W, hCloseX(W), 24, cMuted())
     let cols = colsFor(W, viewMode)
     let n = countLines(ent)
     let i = 0
@@ -493,17 +585,27 @@ func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlB
                 } else {
                     if i == sel || markHas(marked, nm) == 1 { fbRoundRect(px, W, H, cx - 6, cy - 6, cellW - 16, CELLH() - 12, 10, cSel()) }
                     fbBlitAlpha(px, W, H, cx + (cellW - 28 - IBIG()) / 2, cy + 2, ic, IBIG(), IBIG())
-                    let maxc = (cellW - 24) / 8
-                    let lbl = nm
-                    if len(lbl) > maxc { lbl = substring(lbl, 0, maxc) }
-                    let lx = cx + (cellW - 28 - len(lbl) * 8) / 2
-                    fbDrawText(px, W, H, font, lx, cy + 66, lbl, cText())
+                    let maxc = (cellW - 20) / 8
+                    let line1 = nm
+                    let line2 = ""
+                    if len(nm) > maxc {
+                        line1 = substring(nm, 0, maxc)
+                        line2 = substring(nm, maxc, len(nm))
+                        if len(line2) > maxc { line2 = substring(line2, 0, maxc - 1) + "." }
+                    }
+                    let lx1 = cx + (cellW - 28 - len(line1) * 8) / 2
+                    fbDrawText(px, W, H, font, lx1, cy + 64, line1, cText())
+                    if line2 != "" {
+                        let lx2 = cx + (cellW - 28 - len(line2) * 8) / 2
+                        fbDrawText(px, W, H, font, lx2, cy + 80, line2, cText())
+                    }
                 }
             }
         }
         i += 1
     }
     fbFillRect(px, W, SIDEW(), H - 22, W - SIDEW(), 22, cHdr())
+    fbFillRect(px, W, SIDEW(), H - 22, W - SIDEW(), 1, cLine())
     let st = (countLines(ent) - 1) + " items"
     if mode == 1 { st = "rename:  " + textBuf + "_" }
     if mode == 2 { st = "search:  " + textBuf + "_" }
@@ -512,6 +614,7 @@ func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlB
         let items = menuItems()
         let mn = countLines(items)
         let mh = mn * 26 + 8
+        fbRoundRect(px, W, H, menuX - 1, menuY - 1, 190, mh + 2, 7, cLine())
         fbRoundRect(px, W, H, menuX, menuY, 188, mh, 6, cHdr())
         let mi = 0
         while mi < mn {
@@ -563,6 +666,14 @@ just run {
     let mediaBig   = loadIcon("med", mediaSvg(), big)
     let folderSml  = loadIcon("foldersml", folderSvg(), 24)
     let flSml      = loadIcon("filesml", fileSvg(), 24)
+    let homeSml    = loadIcon("homesml", homeSvg(), 24)
+    let driveSml   = loadIcon("drivesml", driveSvg(), 24)
+    let docSml     = loadIcon("docsml", docFolderSvg(), 24)
+    let dlSml      = loadIcon("dlsml", dlFolderSvg(), 24)
+    let musSml     = loadIcon("mussml", musicFolderSvg(), 24)
+    let picSml     = loadIcon("picsml", picFolderSvg(), 24)
+    let vidSml     = loadIcon("vidsml", vidFolderSvg(), 24)
+    let deskSml    = loadIcon("desksml", deskFolderSvg(), 24)
     let places     = buildPlaces()
     let nextId = 12
     let prevBuf = 0  let prevPool = 0  let prevMfd = 0
@@ -682,10 +793,16 @@ just run {
                             if mouseX >= 81 && mouseX < 111 { allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  places = buildPlaces() }
                             dirty = 1
                         }
-                        if mouseY < HDRH() && mouseX >= 136 {
-                            let cp = crumbHit(cwd, 136, W - 136 - 16, mouseX)
+                        if mouseY < HDRH() && mouseX >= W - 153 {
+                            if hHit(hSearchX(W), mouseX) == 1 { mode = 2  textBuf = "" }
+                            if hHit(hViewX(W), mouseX) == 1 { viewMode = 1 - viewMode  scroll = 0 }
+                            if hHit(hMenuX(W), mouseX) == 1 { menuTarget = sel  menuOpen = 1  menuX = hMenuX(W) - 152  menuY = HDRH() }
+                            if hHit(hCloseX(W), mouseX) == 1 { running = 0 }
+                            dirty = 1
+                        } else { if mouseY < HDRH() && mouseX >= 136 {
+                            let cp = crumbHit(cwd, 136, W - 136 - 168, mouseX)
                             if cp != "" && cp != cwd { cwd = cp  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  marked = ""  wlSetTitle(fd, TOP, "cortex - " + basename(cwd))  dirty = 1 }
-                        }
+                        } }
                         if mouseX < SIDEW() && mouseY >= PLY() - 4 {
                             let prow = (mouseY - PLY() + 4) / 30
                             if prow >= 0 && prow < countLines(places) {
@@ -719,7 +836,10 @@ just run {
                             let idx = crow * cols + ccol
                             if ccol >= 0 && ccol < cols && idx >= 0 && idx < countLines(ent) { sel = idx  menuTarget = idx }
                         }
-                        menuOpen = 1  menuX = mouseX  menuY = mouseY  dirty = 1
+                        menuOpen = 1  menuX = mouseX  menuY = mouseY
+                        if menuX + 188 > W { menuX = W - 192 }
+                        if menuY + 224 > H { menuY = H - 224 }
+                        dirty = 1
                     }
                 }
                 if obj == PTR && op == 4 {
@@ -747,7 +867,7 @@ just run {
             let sz = stride * H
             let m = memfdCreate(sz)
             let px = mmapShared(m, sz)
-            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY)
+            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml)
             wlCreatePool(fd, SHM, pool, m, sz)
             wlPoolCreateBuffer(fd, pool, buf, 0, W, H, stride, 1)
             wlSurfaceAttach(fd, SURF, buf, 0, 0)
