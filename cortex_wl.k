@@ -132,6 +132,64 @@ func filterEntries(all, q) {
     }
     emit out
 }
+// breadcrumb (ported from cortex.k; char width = 8 here)
+func crumbs(cwd) {
+    let tab = fromCharCode(9)
+    let home = homeDir()
+    let out = "/" + tab + "/\n"
+    let acc = ""
+    let rest = cwd
+    let underHome = cwd == home
+    if len(cwd) > len(home) && substring(cwd, 0, len(home)) == home && cwd[len(home)] == "/" { underHome = 1 }
+    if underHome == 1 { out = "~" + tab + home + "\n"  acc = home  rest = substring(cwd, len(home), len(cwd)) }
+    let cur = ""
+    let i = 0
+    while i <= len(rest) {
+        let ch = "/"
+        if i < len(rest) { ch = rest[i] }
+        if ch == "/" { if cur != "" { acc = acc + "/" + cur  out = out + cur + tab + acc + "\n"  cur = "" } }
+        else { cur = cur + ch }
+        i += 1
+    }
+    emit out
+}
+func crumbLabel(seg) { let t = indexOf(seg, fromCharCode(9))  emit substring(seg, 0, t) }
+func crumbPath(seg)  { let t = indexOf(seg, fromCharCode(9))  emit substring(seg, t + 1, len(seg)) }
+func drawCrumbs(px, W, H, font, x0, y, maxW, cwd) {
+    let segs = crumbs(cwd)
+    let n = countLines(segs)
+    let cx = x0
+    let i = 0
+    while i < n {
+        let lbl = crumbLabel(nthLine(segs, i))
+        let wseg = len(lbl) * 8
+        if cx + wseg > x0 + maxW { i = n }
+        else {
+            let col = cMuted()
+            if i == n - 1 { col = cText() }
+            fbDrawText(px, W, H, font, cx, y, lbl, col)
+            cx = cx + wseg
+            if i < n - 1 { fbDrawText(px, W, H, font, cx + 4, y, ">", cMuted())  cx = cx + 15 }
+            i += 1
+        }
+    }
+}
+func crumbHit(cwd, x0, maxW, ex) {
+    let segs = crumbs(cwd)
+    let n = countLines(segs)
+    let cx = x0
+    let i = 0
+    while i < n {
+        let lbl = crumbLabel(nthLine(segs, i))
+        let wseg = len(lbl) * 8
+        if cx + wseg > x0 + maxW { emit "" }
+        if ex >= cx && ex < cx + wseg { emit crumbPath(nthLine(segs, i)) }
+        cx = cx + wseg
+        if i < n - 1 { cx = cx + 15 }
+        i += 1
+    }
+    emit ""
+}
 // multi-select: marked = newline-joined entry names
 func markHas(marked, name) {
     if marked == "" { emit 0 }
@@ -395,7 +453,7 @@ func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlB
     fbDrawText(px, W, H, font, 54, 20, ">", cGreenB())
     fbDrawText(px, W, H, font, 90, 20, "o", cGreenB())
     fbRoundRect(px, W, H, 124, 8, W - 124 - 16, 32, 8, cSide())
-    fbDrawText(px, W, H, font, 136, 18, cwd, cText())
+    drawCrumbs(px, W, H, font, 136, 18, W - 136 - 16, cwd)
     let cols = colsFor(W, viewMode)
     let n = countLines(ent)
     let i = 0
@@ -579,6 +637,10 @@ just run {
                             if mouseX >= 45 && mouseX < 75 { if histIdx < countLines(hist) - 1 { histIdx += 1  cwd = nthLine(hist, histIdx)  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  marked = ""  fromHist = 1  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } }
                             if mouseX >= 81 && mouseX < 111 { allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  places = buildPlaces() }
                             dirty = 1
+                        }
+                        if mouseY < HDRH() && mouseX >= 136 {
+                            let cp = crumbHit(cwd, 136, W - 136 - 16, mouseX)
+                            if cp != "" && cp != cwd { cwd = cp  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  marked = ""  wlSetTitle(fd, TOP, "cortex - " + basename(cwd))  dirty = 1 }
                         }
                         if mouseX < SIDEW() && mouseY >= PLY() - 4 {
                             let prow = (mouseY - PLY() + 4) / 30
