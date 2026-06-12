@@ -122,6 +122,7 @@ func buildPlaces() {
 func plLabel(s) { let t = indexOf(s, fromCharCode(9))  emit substring(s, 0, t) }
 func plPath(s)  { let t = indexOf(s, fromCharCode(9))  emit substring(s, t + 1, len(s)) }
 func PLY()      { emit HDRH() + 36 }   // first place row y
+func menuItems() { emit "Open\nCut\nCopy\nPaste\nRename\nMove to Trash\nNew Folder\nOpen Terminal" }
 func entIsDir(e, r) { emit nthLine(e, r)[0] == "d" }
 func entName(e, r)  { let l = nthLine(e, r)  emit substring(l, 2, len(l)) }
 func containsCI(s, q) {
@@ -445,7 +446,7 @@ func fileIconFor(name, fb, img, arc, med) {
 func IBIG() { emit 64 }
 
 // ── render ──────────────────────────────────────────────────────────────────
-func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml) {
+func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY) {
     fbClear(px, W, H, cBg())
     fbFillRect(px, W, 0, HDRH(), SIDEW(), H - HDRH(), cSide())
     fbDrawText(px, W, H, font, 16, HDRH() + 16, "Quick access", cMuted())
@@ -507,6 +508,17 @@ func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlB
     if mode == 1 { st = "rename:  " + textBuf + "_" }
     if mode == 2 { st = "search:  " + textBuf + "_" }
     fbDrawText(px, W, H, font, SIDEW() + 12, H - 8, st, cMuted())
+    if menuOpen == 1 {
+        let items = menuItems()
+        let mn = countLines(items)
+        let mh = mn * 26 + 8
+        fbRoundRect(px, W, H, menuX, menuY, 188, mh, 6, cHdr())
+        let mi = 0
+        while mi < mn {
+            fbDrawText(px, W, H, font, menuX + 16, menuY + 18 + mi * 26, nthLine(items, mi), cText())
+            mi += 1
+        }
+    }
 }
 
 just run {
@@ -558,6 +570,7 @@ just run {
     let hist = cwd + "\n"  let histIdx = 0  let lastCwd = cwd  let fromHist = 0
     let shiftDown = 0  let clipboard = ""  let clipOp = ""
     let mode = 0  let textBuf = ""  let kmap = buildKeymap()  let allEnt = ent  let marked = ""
+    let menuOpen = 0  let menuX = 0  let menuY = 0  let menuTarget = 0
 
     let running = 1
     while running == 1 {
@@ -648,6 +661,21 @@ just run {
                 if obj == PTR && op == 2 { mouseX = wlFixed(eb, off + 12)  mouseY = wlFixed(eb, off + 16) }
                 if obj == PTR && op == 3 {
                     if wlU32(eb, off + 16) == 272 && wlU32(eb, off + 20) == 1 {
+                        if menuOpen == 1 {
+                            let mrow = (mouseY - menuY - 4) / 26
+                            if mouseX >= menuX && mouseX < menuX + 188 && mrow >= 0 && mrow < 8 {
+                                let tn = entName(ent, menuTarget)
+                                if mrow == 0 { if entIsDir(ent, menuTarget) { if tn == ".." { cwd = parentDir(cwd) } else { cwd = joinDir(cwd, tn) }  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } else { openFile(joinDir(cwd, tn)) } }
+                                if mrow == 1 { if tn != ".." { clipboard = joinDir(cwd, tn)  clipOp = "cut" } }
+                                if mrow == 2 { if tn != ".." { clipboard = joinDir(cwd, tn)  clipOp = "copy" } }
+                                if mrow == 3 { if clipboard != "" { if clipOp == "cut" { shellRun("mv --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null")  clipboard = "" } else { shellRun("cp -r --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null") }  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt } }
+                                if mrow == 4 { if tn != ".." { sel = menuTarget  mode = 1  textBuf = tn } }
+                                if mrow == 5 { if tn != ".." { shellRun("gio trash '" + joinDir(cwd, tn) + "' 2>/dev/null || trash-put '" + joinDir(cwd, tn) + "' 2>/dev/null")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt } }
+                                if mrow == 6 { shellRun("mkdir -p '" + cwd + "/New Folder'")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt }
+                                if mrow == 7 { openTerm(cwd) }
+                            }
+                            menuOpen = 0  dirty = 1
+                        } else {
                         if mouseY < HDRH() && mouseX < 120 {
                             if mouseX >= 9 && mouseX < 39 { if histIdx > 0 { histIdx -= 1  cwd = nthLine(hist, histIdx)  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  marked = ""  fromHist = 1  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } }
                             if mouseX >= 45 && mouseX < 75 { if histIdx < countLines(hist) - 1 { histIdx += 1  cwd = nthLine(hist, histIdx)  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  marked = ""  fromHist = 1  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } }
@@ -681,6 +709,17 @@ just run {
                             }
                             dirty = 1
                         }
+                        }
+                    }
+                    if wlU32(eb, off + 16) == 273 && wlU32(eb, off + 20) == 1 {
+                        if mouseX >= SIDEW() && mouseY >= HDRH() {
+                            let cols = colsFor(W, viewMode)
+                            let ccol = (mouseX - SIDEW() - PAD()) / cellWFor(W, viewMode)
+                            let crow = (mouseY - HDRH() - PAD()) / rowHFor(viewMode) + scroll
+                            let idx = crow * cols + ccol
+                            if ccol >= 0 && ccol < cols && idx >= 0 && idx < countLines(ent) { sel = idx  menuTarget = idx }
+                        }
+                        menuOpen = 1  menuX = mouseX  menuY = mouseY  dirty = 1
                     }
                 }
                 if obj == PTR && op == 4 {
@@ -708,7 +747,7 @@ just run {
             let sz = stride * H
             let m = memfdCreate(sz)
             let px = mmapShared(m, sz)
-            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml)
+            draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlBig, musicBig, picBig, vidBig, deskBig, imageBig, archiveBig, mediaBig, places, folderSml, mode, textBuf, marked, viewMode, flSml, menuOpen, menuX, menuY)
             wlCreatePool(fd, SHM, pool, m, sz)
             wlPoolCreateBuffer(fd, pool, buf, 0, W, H, stride, 1)
             wlSurfaceAttach(fd, SURF, buf, 0, 0)
