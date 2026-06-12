@@ -65,9 +65,11 @@ func _wlFind(b, n, iface) {
 // ── file model (dirs-first, like cortex) ────────────────────────────────────
 func openFile(path) { shellRun("xdg-open '" + path + "' >/dev/null 2>&1 &") }
 func openTerm(cwd) { shellRun("cd '" + cwd + "' && setsid sh -c '${TERMINAL:-$(command -v ghostty kitty alacritty foot xterm 2>/dev/null | head -1)}' >/dev/null 2>&1 &") }
-func buildEntries(cwd, showHidden) {
+func buildEntries(cwd, showHidden, sortMode) {
     let flag = "-1p"
-    if showHidden == 1 { flag = "-1pA" }
+    if showHidden == 1 { flag = flag + "A" }
+    if sortMode == 1 { flag = flag + "S" }
+    if sortMode == 2 { flag = flag + "t" }
     let raw = exec("ls " + flag + " '" + cwd + "' 2>/dev/null")
     let dirs = ""
     let files = ""
@@ -396,8 +398,8 @@ just run {
 
     let W = 900  let H = 600
     let cwd = chomp(exec("printf %s \"$HOME\""))
-    let showHidden = 0
-    let ent = buildEntries(cwd, showHidden)
+    let showHidden = 0  let sortMode = 0
+    let ent = buildEntries(cwd, showHidden, sortMode)
     let sel = 0  let scroll = 0
     let font = wlFontLoad()
     let big = IBIG()
@@ -446,7 +448,7 @@ just run {
                         if mode == 1 || mode == 2 {
                             if kc == 9 { if mode == 2 { ent = allEnt  sel = 0 }  mode = 0  textBuf = "" }
                             else { if kc == 36 {
-                                if mode == 1 { if textBuf != "" { shellRun("mv -n '" + cwd + "/" + entName(ent, sel) + "' '" + cwd + "/" + textBuf + "' 2>/dev/null")  allEnt = buildEntries(cwd, showHidden)  ent = allEnt } }
+                                if mode == 1 { if textBuf != "" { shellRun("mv -n '" + cwd + "/" + entName(ent, sel) + "' '" + cwd + "/" + textBuf + "' 2>/dev/null")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt } }
                                 mode = 0  textBuf = ""
                             } else { if kc == 22 { if len(textBuf) > 0 { textBuf = substring(textBuf, 0, len(textBuf) - 1) }  if mode == 2 { ent = filterEntries(allEnt, textBuf)  sel = 0 } }
                             else { let ch2 = keyChar(kmap, kc, shiftDown)  if ch2 != "" { textBuf = textBuf + ch2  if mode == 2 { ent = filterEntries(allEnt, textBuf)  sel = 0 } } } } }
@@ -461,24 +463,30 @@ just run {
                             if entIsDir(ent, sel) {
                                 let nm = entName(ent, sel)
                                 if nm == ".." { cwd = parentDir(cwd) } else { cwd = joinDir(cwd, nm) }
-                                allEnt = buildEntries(cwd, showHidden)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""
+                                allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""
                                 wlSetTitle(fd, TOP, "cortex - " + basename(cwd))
                             } else { openFile(joinDir(cwd, entName(ent, sel))) }
                         }
-                        if kc == 22 { cwd = parentDir(cwd)  allEnt = buildEntries(cwd, showHidden)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = "" }  // Backspace
+                        if kc == 22 { cwd = parentDir(cwd)  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = "" }  // Backspace
                         if kc == 9 { running = 0 }                                          // Esc
-                        if kc == 43 && ctrlDown == 1 { showHidden = 1 - showHidden  allEnt = buildEntries(cwd, showHidden)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = "" }  // Ctrl+H hidden
+                        if kc == 43 && ctrlDown == 1 { showHidden = 1 - showHidden  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = "" }  // Ctrl+H hidden
                         if kc == 70 { openTerm(cwd) }                                        // F4 terminal
-                        if kc == 71 { allEnt = buildEntries(cwd, showHidden)  ent = allEnt }                  // F5 refresh
-                        if kc == 110 && altDown == 1 { cwd = homeDir()  allEnt = buildEntries(cwd, showHidden)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }  // Alt+Home
+                        if kc == 71 { allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt }                  // F5 refresh
+                        if kc == 110 && altDown == 1 { cwd = homeDir()  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }  // Alt+Home
                         if kc == 54 && ctrlDown == 1 { if entName(ent, sel) != ".." { clipboard = joinDir(cwd, entName(ent, sel))  clipOp = "copy" } }  // Ctrl+C
                         if kc == 53 && ctrlDown == 1 { if entName(ent, sel) != ".." { clipboard = joinDir(cwd, entName(ent, sel))  clipOp = "cut" } }   // Ctrl+X
-                        if kc == 55 && ctrlDown == 1 { if clipboard != "" { if clipOp == "cut" { shellRun("mv --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null")  clipboard = "" } else { shellRun("cp -r --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null") }  allEnt = buildEntries(cwd, showHidden)  ent = allEnt } }  // Ctrl+V
-                        if kc == 119 { if entName(ent, sel) != ".." { shellRun("gio trash '" + joinDir(cwd, entName(ent, sel)) + "' 2>/dev/null || trash-put '" + joinDir(cwd, entName(ent, sel)) + "' 2>/dev/null")  allEnt = buildEntries(cwd, showHidden)  ent = allEnt  if sel >= countLines(ent) { sel = countLines(ent) - 1 } } }  // Delete -> trash
-                        if kc == 57 && ctrlDown == 1 && shiftDown == 1 { shellRun("mkdir -p '" + cwd + "/New Folder'")  allEnt = buildEntries(cwd, showHidden)  ent = allEnt }  // Ctrl+Shift+N new folder
-                        if kc == 57 && ctrlDown == 1 && shiftDown == 0 { shellRun("touch '" + cwd + "/New File'")  allEnt = buildEntries(cwd, showHidden)  ent = allEnt }  // Ctrl+N new file
+                        if kc == 55 && ctrlDown == 1 { if clipboard != "" { if clipOp == "cut" { shellRun("mv --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null")  clipboard = "" } else { shellRun("cp -r --backup=numbered '" + clipboard + "' '" + cwd + "/' 2>/dev/null") }  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt } }  // Ctrl+V
+                        if kc == 119 { if entName(ent, sel) != ".." { shellRun("gio trash '" + joinDir(cwd, entName(ent, sel)) + "' 2>/dev/null || trash-put '" + joinDir(cwd, entName(ent, sel)) + "' 2>/dev/null")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  if sel >= countLines(ent) { sel = countLines(ent) - 1 } } }  // Delete -> trash
+                        if kc == 57 && ctrlDown == 1 && shiftDown == 1 { shellRun("mkdir -p '" + cwd + "/New Folder'")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt }  // Ctrl+Shift+N new folder
+                        if kc == 57 && ctrlDown == 1 && shiftDown == 0 { shellRun("touch '" + cwd + "/New File'")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt }  // Ctrl+N new file
                         if kc == 68 { if entName(ent, sel) != ".." { mode = 1  textBuf = entName(ent, sel) } }   // F2 rename
                         if kc == 41 && ctrlDown == 1 { mode = 2  textBuf = "" }              // Ctrl+F search
+                        if kc == 39 && ctrlDown == 1 { sortMode = sortMode + 1  if sortMode > 2 { sortMode = 0 }  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0 }  // Ctrl+S sort
+                        if kc == 27 && ctrlDown == 1 && shiftDown == 1 { if entName(ent, sel) != ".." { shellRun("cd '" + cwd + "' && cp -r --backup=numbered '" + entName(ent, sel) + "' '" + entName(ent, sel) + ".copy' 2>/dev/null")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt } }  // Ctrl+Shift+R duplicate
+                        if kc == 52 && ctrlDown == 1 && shiftDown == 1 { if entName(ent, sel) != ".." { shellRun("cd '" + cwd + "' && (zip -r -q '" + entName(ent, sel) + ".zip' '" + entName(ent, sel) + "' 2>/dev/null || tar czf '" + entName(ent, sel) + ".tar.gz' '" + entName(ent, sel) + "' 2>/dev/null)")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt } }  // Ctrl+Shift+Z compress
+                        if kc == 26 && ctrlDown == 1 { if entName(ent, sel) != ".." { shellRun("cd '" + cwd + "' && (bsdtar -xf '" + entName(ent, sel) + "' 2>/dev/null || tar xf '" + entName(ent, sel) + "' 2>/dev/null || unzip -o '" + entName(ent, sel) + "' 2>/dev/null)")  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt } }  // Ctrl+E extract
+                        if kc == 58 && ctrlDown == 1 { shellRun("lsblk -Pno NAME,MOUNTPOINT,RM,TYPE,FSTYPE 2>/dev/null | while read l; do eval \"$l\"; if [ \"$TYPE\" = part ] && [ \"$RM\" = 1 ] && [ -n \"$FSTYPE\" ] && [ -z \"$MOUNTPOINT\" ]; then udisksctl mount -b \"/dev/$NAME\" >/dev/null 2>&1; fi; done")  places = buildPlaces() }  // Ctrl+M mount all
+                        if kc == 28 && ctrlDown == 1 && shiftDown == 1 { shellRun("mkdir -p '" + homeDir() + "/.local/share/Trash/files' 2>/dev/null")  cwd = homeDir() + "/.local/share/Trash/files"  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  wlSetTitle(fd, TOP, "cortex - Trash") }  // Ctrl+Shift+T trash view
                         // keep selection visible
                         let vis = (H - HDRH() - PAD() - 10) / CELLH()
                         let srow = sel / cols
@@ -499,16 +507,16 @@ just run {
                 if obj == PTR && op == 3 {
                     if wlU32(eb, off + 16) == 272 && wlU32(eb, off + 20) == 1 {
                         if mouseY < HDRH() && mouseX < 120 {
-                            if mouseX >= 9 && mouseX < 39 { if histIdx > 0 { histIdx -= 1  cwd = nthLine(hist, histIdx)  allEnt = buildEntries(cwd, showHidden)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  fromHist = 1  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } }
-                            if mouseX >= 45 && mouseX < 75 { if histIdx < countLines(hist) - 1 { histIdx += 1  cwd = nthLine(hist, histIdx)  allEnt = buildEntries(cwd, showHidden)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  fromHist = 1  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } }
-                            if mouseX >= 81 && mouseX < 111 { allEnt = buildEntries(cwd, showHidden)  ent = allEnt  places = buildPlaces() }
+                            if mouseX >= 9 && mouseX < 39 { if histIdx > 0 { histIdx -= 1  cwd = nthLine(hist, histIdx)  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  fromHist = 1  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } }
+                            if mouseX >= 45 && mouseX < 75 { if histIdx < countLines(hist) - 1 { histIdx += 1  cwd = nthLine(hist, histIdx)  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  fromHist = 1  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) } }
+                            if mouseX >= 81 && mouseX < 111 { allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  places = buildPlaces() }
                             dirty = 1
                         }
                         if mouseX < SIDEW() && mouseY >= PLY() - 4 {
                             let prow = (mouseY - PLY() + 4) / 30
                             if prow >= 0 && prow < countLines(places) {
                                 let tgt = plPath(nthLine(places, prow))
-                                if tgt != cwd { cwd = tgt  allEnt = buildEntries(cwd, showHidden)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }
+                                if tgt != cwd { cwd = tgt  allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""  wlSetTitle(fd, TOP, "cortex - " + basename(cwd)) }
                             }
                             dirty = 1
                         }
@@ -521,7 +529,7 @@ just run {
                                 if idx == sel && entIsDir(ent, idx) {
                                     let nm = entName(ent, idx)
                                     if nm == ".." { cwd = parentDir(cwd) } else { cwd = joinDir(cwd, nm) }
-                                    allEnt = buildEntries(cwd, showHidden)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""
+                                    allEnt = buildEntries(cwd, showHidden, sortMode)  ent = allEnt  sel = 0  scroll = 0  mode = 0  textBuf = ""
                                     wlSetTitle(fd, TOP, "cortex - " + basename(cwd))
                                 } else { sel = idx }
                             }
