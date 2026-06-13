@@ -572,7 +572,7 @@ func draw(px, W, H, font, cwd, ent, sel, scroll, folderBig, fileBig, docBig, dlB
         let py = PLY() + p * 30
         if plPath(line) == cwd { fbRoundRect(px, W, H, 6, py - 4, SIDEW() - 12, 28, 8, cSel()) }
         fbBlitAlpha(px, W, H, 14, py - 4, placeIconFor(plKind(line), folderSml, homeSml, driveSml, docSml, dlSml, musSml, picSml, vidSml, deskSml, netSml), 24, 24)
-        fbDrawText(px, W, H, font, 44, py + 8, plLabel(line), cText())
+        fbDrawText(px, W, H, font, 44, py, plLabel(line), cText())
         p += 1
     }
     fbFillRect(px, W, 0, 0, W, HDRH(), cHdr())
